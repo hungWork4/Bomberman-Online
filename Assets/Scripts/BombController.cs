@@ -5,13 +5,13 @@ using UnityEngine.Tilemaps;
 public class BombController : MonoBehaviour
 {
     [Header("Bomb")]
-    public KeyCode inputKey = KeyCode.LeftShift;
-    public GameObject bombPrefab;
-    public float bombFuseTime = 3f;
-    public int bombAmount = 1;
-    [SerializeField]private int bombsRemaining;
-    public int explosionRadius = 1;
-
+    [SerializeField] private KeyCode inputKey = KeyCode.LeftShift;
+    [SerializeField] private GameObject bombPrefab;
+    [SerializeField] private float bombFuseTime = 3f;
+    [SerializeField] private int bombAmount = 1;
+    [SerializeField] private int bombsRemaining;
+    [SerializeField] private int explosionRadius = 1;
+    public int ExplosionRadius { get => explosionRadius; set => explosionRadius = value; }
 
     [Header("Destructible")]
     public Tilemap destructibleTiles;
@@ -20,11 +20,15 @@ public class BombController : MonoBehaviour
     private void OnEnable()
     {
         bombsRemaining = bombAmount;
+        Debug.Log("load Destructibles");
+        //if(destructibleTiles== null)
+        //    destructibleTiles = GameObject.Find("Stage/Destructibles").GetComponent<Tilemap>();
     }
 
     private void Update()
     {
-        if (bombsRemaining > 0 && Input.GetKeyDown(inputKey)) {
+        if (bombsRemaining > 0 && Input.GetKeyDown(inputKey))
+        {
             StartCoroutine(PlaceBomb());
         }
     }
@@ -39,13 +43,13 @@ public class BombController : MonoBehaviour
         Bombit bombit = bomb.GetComponent<Bombit>();
         if (bombit != null)
         {
-            bombit.Initialize(destructibleTiles, explosionRadius);
+            bombit.Initialize(destructibleTiles, ExplosionRadius);
         }
 
         bombsRemaining--;
 
         yield return new WaitForSeconds(bombFuseTime);
-        if(bomb == null)
+        if (bomb == null)
         {
             //phongf trg hoop bi kick no trc
             bombsRemaining++;
@@ -55,7 +59,7 @@ public class BombController : MonoBehaviour
         position.x = Mathf.Round(position.x);
         position.y = Mathf.Round(position.y);
 
-        bomb.GetComponent<Bombit>().bombexplosion(position, destructibleTiles, explosionRadius );
+        bomb.GetComponent<Bombit>().bombexplosion(position, destructibleTiles, ExplosionRadius);
 
         Destroy(bomb);
         bombsRemaining++;
@@ -68,7 +72,8 @@ public class BombController : MonoBehaviour
 
     private void OnTriggerExit2D(Collider2D other)
     {
-        if (other.gameObject.layer == LayerMask.NameToLayer("Bomb")) {
+        if (other.gameObject.layer == LayerMask.NameToLayer("Bomb"))
+        {
             other.isTrigger = false;
         }
     }

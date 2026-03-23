@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7249887262747650566}
   - component: {fileID: 929385142751814527}
   - component: {fileID: -8738203639632321532}
+  - component: {fileID: 8049176040968240870}
   m_Layer: 6
   m_Name: Destructible
   m_TagString: Untagged
@@ -174,3 +175,24 @@ MonoBehaviour:
   - {fileID: 5681734161811793622, guid: f832a23e62e95c4449daa85b028d43d5, type: 3}
   - {fileID: 7266525813312433372, guid: 29385601a56e22b4faac44675679793e, type: 3}
   - {fileID: 1671571660335848563, guid: 9c2bdb21ab8265641bc0fc2d66b5f0f1, type: 3}
+--- !u!114 &8049176040968240870
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 929385142751814526}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1

@@ -1,24 +1,25 @@
-﻿using UnityEngine;
-using UnityEngine.Windows;
+﻿using Unity.Netcode;
+using UnityEngine;
 using Input = UnityEngine.Input;
 
-[RequireComponent(typeof(Rigidbody2D), typeof(Animator))]
-public class PlayerController : MonoBehaviour
+[RequireComponent(typeof(Rigidbody2D))]
+public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
     public float moveSpeed = 5f;
 
-    private Rigidbody2D rb;
-    private Animator anim;
-    private Vector2 direction;
-    private Vector2 lastDirection;
+    [Header("Remote Sync")]
+    [SerializeField] private float remotePositionLerp = 16f;
 
-    // Sử dụng StringToHash để tối ưu hiệu suất thay vì dùng string trực tiếp
-    private readonly int animMoveX = Animator.StringToHash("MoveX");
-    private readonly int animMoveY = Animator.StringToHash("MoveY");
-    private readonly int animSpeed = Animator.StringToHash("Speed");
-    private readonly int animLastMoveX = Animator.StringToHash("LastMoveX");
-    private readonly int animLastMoveY = Animator.StringToHash("LastMoveY");
+    [Header("References")]
+    [SerializeField] private PlayerVisual playerVisual;
+
+    private Rigidbody2D rb;
+    private Vector2 direction;
+
+    private Vector2 remoteTargetPosition;
+    private Vector2 remoteVelocity;
+    private bool hasRemoteState;
 
     [Header("Input")]
     public KeyCode inputUp = KeyCode.W;
@@ -29,105 +30,145 @@ public class PlayerController : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        anim = GetComponent<Animator>();
 
-        // Setup Rigidbody2D để phù hợp với top-down
+        if (playerVisual == null)
+        {
+            playerVisual = GetComponentInChildren<PlayerVisual>(true);
+        }
+
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
-
-        // Mặc định nhân vật hướng xuống dưới
-        lastDirection = new Vector2(0, -1);
     }
 
     private void Update()
     {
+        if (!IsOwner)
+        {
+            return;
+        }
+
         if (Input.GetKey(inputUp))
         {
-            direction =Vector2.up;
-            // 2. Lưu lại hướng cuối cùng để chạy animation Idle chính xác
-            if (direction.sqrMagnitude > 0)
-            {
-                lastDirection = direction;
-            }
+            direction = Vector2.up;
         }
         else if (Input.GetKey(inputDown))
         {
             direction = Vector2.down;
-            // 2. Lưu lại hướng cuối cùng để chạy animation Idle chính xác
-            if (direction.sqrMagnitude > 0)
-            {
-                lastDirection = direction;
-            }
         }
         else if (Input.GetKey(inputLeft))
         {
             direction = Vector2.left;
-            // 2. Lưu lại hướng cuối cùng để chạy animation Idle chính xác
-            if (direction.sqrMagnitude > 0)
-            {
-                lastDirection = direction;
-            }
         }
         else if (Input.GetKey(inputRight))
         {
             direction = Vector2.right;
-            // 2. Lưu lại hướng cuối cùng để chạy animation Idle chính xác
-            if (direction.sqrMagnitude > 0)
-            {
-                lastDirection = direction;
-            }
         }
         else
         {
             direction = Vector2.zero;
         }
 
-
-
-        // 3. Cập nhật các tham số cho Animator
-        UpdateAnimator();
+        playerVisual?.SetMovement(direction);
     }
 
     private void FixedUpdate()
     {
-        // 4. Xử lý di chuyển trong FixedUpdate để vật lý mượt mà hơn
-        Vector2 position = rb.position;
-        Vector2 translation = moveSpeed * Time.fixedDeltaTime * direction;
+        if (!IsSpawned)
+        {
+            return;
+        }
 
-        rb.MovePosition(position + translation);
-        //rb.MovePosition(rb.position + movement * (moveSpeed * Time.fixedDeltaTime));
+        if (IsOwner)
+        {
+            if (IsServer)
+            {
+                Vector2 position;
+                Vector2 velocity;
+                Simulate(direction, out position, out velocity);
+                BroadcastStateClientRpc(position, velocity);
+            }
+            else
+            {
+                SubmitInputServerRpc(direction);
+            }
+        }
+        else if (!IsServer && hasRemoteState)
+        {
+            Vector2 smoothedPosition = Vector2.Lerp(rb.position, remoteTargetPosition, remotePositionLerp * Time.fixedDeltaTime);
+            rb.MovePosition(smoothedPosition);
+        }
     }
+
+    private void Simulate(Vector2 inputDirection, out Vector2 position, out Vector2 velocity)
+    {
+        Vector2 currentPosition = rb.position;
+        velocity = inputDirection * moveSpeed;
+        position = currentPosition + velocity * Time.fixedDeltaTime;
+        rb.MovePosition(position);
+    }
+
+    [ServerRpc]
+    private void SubmitInputServerRpc(Vector2 inputDirection, ServerRpcParams serverRpcParams = default)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        Vector2 position;
+        Vector2 velocity;
+        Simulate(inputDirection, out position, out velocity);
+        BroadcastStateClientRpc(position, velocity);
+    }
+
+    [ClientRpc]
+    private void BroadcastStateClientRpc(Vector2 position, Vector2 velocity)
+    {
+        if (IsOwner && !IsServer)
+        {
+            rb.position = position;
+            Vector2 visualDirection = velocity.sqrMagnitude > 0f ? velocity.normalized : Vector2.zero;
+            playerVisual?.SetMovement(visualDirection);
+            return;
+        }
+
+        if (!IsOwner)
+        {
+            remoteTargetPosition = position;
+            remoteVelocity = velocity;
+
+            if (!hasRemoteState)
+            {
+                rb.position = remoteTargetPosition;
+            }
+
+            hasRemoteState = true;
+
+            Vector2 visualDirection = remoteVelocity.sqrMagnitude > 0f ? remoteVelocity.normalized : Vector2.zero;
+            playerVisual?.SetMovement(visualDirection);
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Explosion"))
         {
             DeathSequence();
-            anim.SetBool("IsDead", true);
+            playerVisual?.SetDead(true);
         }
     }
+
     private void DeathSequence()
     {
         enabled = false;
         GetComponent<BombController>().enabled = false;
-        GetComponent<SpriteRenderer>().sortingOrder = 1;
+        playerVisual?.SetSortingOrder(1);
         GetComponent<Collider2D>().enabled = false;
         Invoke(nameof(OnDeathSequenceEnded), 1.25f);
     }
+
     private void OnDeathSequenceEnded()
     {
-        //gameObject.SetActive(false);
-        //GameManager.Instance.CheckWinState();
         Debug.Log("Player has died. Implement death handling logic here.");
-    }
-    private void UpdateAnimator()
-    {
-        // Truyền giá trị đang di chuyển
-        anim.SetFloat(animMoveX, direction.x);
-        anim.SetFloat(animMoveY, direction.y);
-        anim.SetFloat(animSpeed, direction.sqrMagnitude);
-
-        // Truyền giá trị hướng mặt cuối cùng (dùng cho Blend Tree Idle)
-        anim.SetFloat(animLastMoveX, lastDirection.x);
-        anim.SetFloat(animLastMoveY, lastDirection.y);
     }
 }
