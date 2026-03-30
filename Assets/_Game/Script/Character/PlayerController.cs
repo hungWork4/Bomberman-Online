@@ -1,5 +1,6 @@
 ﻿using Unity.Netcode;
 using UnityEngine;
+using System.Collections.Generic; // 🔥 ADD
 using Input = UnityEngine.Input;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -26,6 +27,30 @@ public class PlayerController : NetworkBehaviour
     public KeyCode inputDown = KeyCode.S;
     public KeyCode inputLeft = KeyCode.A;
     public KeyCode inputRight = KeyCode.D;
+
+    // =========================
+    // 🔥 PREDICTION VARIABLES
+    // =========================
+    private struct InputPayload
+    {
+        public int tick;
+        public Vector2 direction;
+    }
+
+    private struct StatePayload
+    {
+        public int tick;
+        public Vector2 position;
+    }
+
+    private List<InputPayload> inputBuffer = new List<InputPayload>();
+    private List<StatePayload> stateBuffer = new List<StatePayload>();
+
+    private int currentTick;
+    private const int BUFFER_SIZE = 1024;
+
+    // server tick nhận về
+    private int lastServerTick; // 🔥 ADD
 
     private void Awake()
     {
@@ -80,22 +105,61 @@ public class PlayerController : NetworkBehaviour
 
         if (IsOwner)
         {
+            currentTick++; // 🔥 ADD
+
             if (IsServer)
             {
                 Vector2 position;
                 Vector2 velocity;
+
+                // 🔥 PREDICT LOCAL
                 Simulate(direction, out position, out velocity);
-                BroadcastStateClientRpc(position, velocity);
+
+                SaveState(position); // 🔥 ADD
+
+                BroadcastStateClientRpc(position, velocity, currentTick); // 🔥 ADD tick
             }
             else
             {
-                SubmitInputServerRpc(direction);
+                // 🔥 CLIENT PREDICTION
+                Vector2 position;
+                Vector2 velocity;
+
+                Simulate(direction, out position, out velocity);
+                SaveState(position);
+
+                SubmitInputServerRpc(direction, currentTick); // 🔥 gửi tick
             }
+
+            // 🔥 RECONCILIATION
+            Reconcile(); // 🔥 ADD
         }
         else if (!IsServer && hasRemoteState)
         {
             Vector2 smoothedPosition = Vector2.Lerp(rb.position, remoteTargetPosition, remotePositionLerp * Time.fixedDeltaTime);
             rb.MovePosition(smoothedPosition);
+        }
+    }
+
+    // 🔥 SAVE STATE
+    private void SaveState(Vector2 position)
+    {
+        inputBuffer.Add(new InputPayload
+        {
+            tick = currentTick,
+            direction = direction
+        });
+
+        stateBuffer.Add(new StatePayload
+        {
+            tick = currentTick,
+            position = position
+        });
+
+        if (inputBuffer.Count > BUFFER_SIZE)
+        {
+            inputBuffer.RemoveAt(0);
+            stateBuffer.RemoveAt(0);
         }
     }
 
@@ -108,7 +172,7 @@ public class PlayerController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SubmitInputServerRpc(Vector2 inputDirection, ServerRpcParams serverRpcParams = default)
+    private void SubmitInputServerRpc(Vector2 inputDirection, int tick, ServerRpcParams serverRpcParams = default) // 🔥 ADD tick
     {
         if (!IsServer)
         {
@@ -117,16 +181,21 @@ public class PlayerController : NetworkBehaviour
 
         Vector2 position;
         Vector2 velocity;
+
         Simulate(inputDirection, out position, out velocity);
-        BroadcastStateClientRpc(position, velocity);
+
+        BroadcastStateClientRpc(position, velocity, tick); // 🔥 gửi tick
     }
 
     [ClientRpc]
-    private void BroadcastStateClientRpc(Vector2 position, Vector2 velocity)
+    private void BroadcastStateClientRpc(Vector2 position, Vector2 velocity, int tick) // 🔥 ADD tick
     {
         if (IsOwner && !IsServer)
         {
+            lastServerTick = tick; // 🔥 ADD
+
             rb.position = position;
+
             Vector2 visualDirection = velocity.sqrMagnitude > 0f ? velocity.normalized : Vector2.zero;
             playerVisual?.SetMovement(visualDirection);
             return;
@@ -146,6 +215,37 @@ public class PlayerController : NetworkBehaviour
 
             Vector2 visualDirection = remoteVelocity.sqrMagnitude > 0f ? remoteVelocity.normalized : Vector2.zero;
             playerVisual?.SetMovement(visualDirection);
+        }
+    }
+
+    // 🔥 CORE RECONCILE
+    private void Reconcile()
+    {
+        if (lastServerTick == 0) return;
+
+        int index = stateBuffer.FindIndex(s => s.tick == lastServerTick);
+        if (index == -1) return;
+
+        Vector2 serverPos = rb.position;
+        Vector2 localPos = stateBuffer[index].position;
+
+        float error = Vector2.Distance(localPos, serverPos);
+
+        if (error < 0.01f) return;
+
+        // rollback
+        rb.position = serverPos;
+
+        // remove old
+        inputBuffer.RemoveRange(0, index + 1);
+        stateBuffer.RemoveRange(0, index + 1);
+
+        // replay
+        foreach (var input in inputBuffer)
+        {
+            Vector2 pos;
+            Vector2 vel;
+            Simulate(input.direction, out pos, out vel);
         }
     }
 
