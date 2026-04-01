@@ -1,7 +1,8 @@
+using Unity.Netcode;
 using UnityEngine;
 
 [RequireComponent(typeof(SpriteRenderer))]
-public class AnimatedSpriteRenderer : MonoBehaviour
+public class AnimatedSpriteRenderer : NetworkBehaviour
 {
     private SpriteRenderer spriteRenderer;
 

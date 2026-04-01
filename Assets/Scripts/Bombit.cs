@@ -1,9 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
-public class Bombit : MonoBehaviour
+public class Bombit : NetworkBehaviour
 {
     [Header("Explosion")]
     public Explosion explosionPrefab;
@@ -35,8 +36,9 @@ public class Bombit : MonoBehaviour
         }
         hasExploded = true;
         Explosion explosion = Instantiate(explosionPrefab, position, Quaternion.identity);
-        explosion.SetActiveRenderer(explosion.start);
-        explosion.DestroyAfter(explosionDuration);
+        explosion.GetComponent<NetworkObject>().Spawn();
+        explosion.SetActiveRendererClientRpc(0);
+        explosion.DestroyAfterClientRpc(explosionDuration);
 
         Explode(position, Vector2.up, explosionRadius, destructibleTiles);
         Explode(position, Vector2.down, explosionRadius, destructibleTiles);
@@ -64,9 +66,11 @@ public class Bombit : MonoBehaviour
         }
 
         Explosion explosion = Instantiate(explosionPrefab, position, Quaternion.identity);
-        explosion.SetActiveRenderer(length > 1 ? explosion.middle : explosion.end);
-        explosion.SetDirection(direction);
-        explosion.DestroyAfter(explosionDuration);
+        explosion.GetComponent<NetworkObject>().Spawn();
+
+        explosion.SetActiveRendererClientRpc(length > 1 ? 1 : 2);
+        explosion.SetDirectionClientRpc(direction);
+        explosion.DestroyAfterClientRpc(explosionDuration);
 
         Explode(position, direction, length - 1, destructibleTiles);
     }
@@ -93,6 +97,7 @@ public class Bombit : MonoBehaviour
         position.y = Mathf.Round(position.y);
 
         bombexplosion(position, assignedDestructibleTiles, assignedExplosionRadius + 1);
+        this.GetComponent<NetworkObject>().Despawn();
         Destroy(gameObject);
     }
 
