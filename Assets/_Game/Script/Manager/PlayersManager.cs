@@ -22,9 +22,8 @@ public class PlayersManager : NetworkBehaviour
         }
 
         Instance = this;
-
-
     }
+
     private void OnDestroy()
     {
         if (Instance == this)
@@ -63,7 +62,19 @@ public class PlayersManager : NetworkBehaviour
         }
     }
 
-    //ConnectionApprovalResponse là “phiếu quyết định” của server cho mỗi request kết nối: có cho vào không, có spawn player không, và spawn ở đâu.
+    private int GetOrCreateSpawnIndex(ulong clientId)
+    {
+        if (clientSpawnIndices.TryGetValue(clientId, out int existingIndex))
+        {
+            return existingIndex;
+        }
+
+        int spawnIndex = nextSpawnPointIndex % spawnPoints.Count;
+        nextSpawnPointIndex++;
+        clientSpawnIndices[clientId] = spawnIndex;
+        return spawnIndex;
+    }
+
     public void ApprovalCheck(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
     {
         response.Approved = true;
@@ -77,11 +88,7 @@ public class PlayersManager : NetworkBehaviour
             return;
         }
 
-        int spawnIndex = nextSpawnPointIndex % spawnPoints.Count;
-        nextSpawnPointIndex++;
-
-        clientSpawnIndices[request.ClientNetworkId] = spawnIndex;
-
+        int spawnIndex = GetOrCreateSpawnIndex(request.ClientNetworkId);
         Transform spawnPoint = spawnPoints[spawnIndex];
         response.Position = spawnPoint.position;
         response.Rotation = spawnPoint.rotation;

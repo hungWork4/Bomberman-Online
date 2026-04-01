@@ -1,7 +1,6 @@
 ﻿using Unity.Netcode;
 using UnityEngine;
-using System.Collections.Generic; // 🔥 ADD
-using Input = UnityEngine.Input;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : NetworkBehaviour
@@ -16,11 +15,7 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private PlayerVisual playerVisual;
 
     private Rigidbody2D rb;
-    private Vector2 direction;
-
-    private Vector2 remoteTargetPosition;
-    private Vector2 remoteVelocity;
-    private bool hasRemoteState;
+    private Vector2 currentInput;
 
     [Header("Input")]
     public KeyCode inputUp = KeyCode.W;
@@ -29,28 +24,49 @@ public class PlayerController : NetworkBehaviour
     public KeyCode inputRight = KeyCode.D;
 
     // =========================
-    // 🔥 PREDICTION VARIABLES
+    // 🔥 OPTIMIZED SYNC VARIABLES
     // =========================
-    private struct InputPayload
+    private struct InputPayload : INetworkSerializable
     {
         public int tick;
         public Vector2 direction;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref tick);
+            serializer.SerializeValue(ref direction);
+        }
     }
 
-    private struct StatePayload
+    private struct StatePayload : INetworkSerializable, System.IEquatable<StatePayload>
     {
         public int tick;
         public Vector2 position;
+        public Vector2 velocity;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref tick);
+            serializer.SerializeValue(ref position);
+            serializer.SerializeValue(ref velocity);
+        }
+
+        public bool Equals(StatePayload other)
+        {
+            return tick == other.tick && position == other.position && velocity == other.velocity;
+        }
     }
 
+    // Sử dụng NetworkVariable để tránh Spam RPC và tự động đồng bộ cho người vào sau (Late-join)
+    private NetworkVariable<StatePayload> serverState = new NetworkVariable<StatePayload>(
+        new StatePayload(),
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     private List<InputPayload> inputBuffer = new List<InputPayload>();
-    private List<StatePayload> stateBuffer = new List<StatePayload>();
-
-    private int currentTick;
-    private const int BUFFER_SIZE = 1024;
-
-    // server tick nhận về
-    private int lastServerTick; // 🔥 ADD
+    private int localTick;
+    private StatePayload lastProcessedState;
 
     private void Awake()
     {
@@ -65,210 +81,194 @@ public class PlayerController : NetworkBehaviour
         rb.freezeRotation = true;
     }
 
-    private void Update()
+    public override void OnNetworkSpawn()
     {
-        if (!IsOwner)
-        {
-            return;
-        }
+        Vector2 spawnedPosition = transform.position;
+        rb.position = spawnedPosition;
 
-        if (Input.GetKey(inputUp))
+        if (IsServer)
         {
-            direction = Vector2.up;
-        }
-        else if (Input.GetKey(inputDown))
-        {
-            direction = Vector2.down;
-        }
-        else if (Input.GetKey(inputLeft))
-        {
-            direction = Vector2.left;
-        }
-        else if (Input.GetKey(inputRight))
-        {
-            direction = Vector2.right;
-        }
-        else
-        {
-            direction = Vector2.zero;
-        }
-
-        playerVisual?.SetMovement(direction);
-    }
-
-    private void FixedUpdate()
-    {
-        if (!IsSpawned)
-        {
-            return;
-        }
-
-        if (IsOwner)
-        {
-            currentTick++; // 🔥 ADD
-
-            if (IsServer)
+            serverState.Value = new StatePayload
             {
-                Vector2 position;
-                Vector2 velocity;
-
-                // 🔥 PREDICT LOCAL
-                Simulate(direction, out position, out velocity);
-
-                SaveState(position); // 🔥 ADD
-
-                BroadcastStateClientRpc(position, velocity, currentTick); // 🔥 ADD tick
-            }
-            else
-            {
-                // 🔥 CLIENT PREDICTION
-                Vector2 position;
-                Vector2 velocity;
-
-                Simulate(direction, out position, out velocity);
-                SaveState(position);
-
-                SubmitInputServerRpc(direction, currentTick); // 🔥 gửi tick
-            }
-
-            // 🔥 RECONCILIATION
-            Reconcile(); // 🔥 ADD
+                tick = 0,
+                position = spawnedPosition,
+                velocity = Vector2.zero
+            };
         }
-        else if (!IsServer && hasRemoteState)
-        {
-            Vector2 smoothedPosition = Vector2.Lerp(rb.position, remoteTargetPosition, remotePositionLerp * Time.fixedDeltaTime);
-            rb.MovePosition(smoothedPosition);
-        }
+
+        lastProcessedState = serverState.Value;
     }
 
-    // 🔥 SAVE STATE
-    private void SaveState(Vector2 position)
-    {
-        inputBuffer.Add(new InputPayload
-        {
-            tick = currentTick,
-            direction = direction
-        });
-
-        stateBuffer.Add(new StatePayload
-        {
-            tick = currentTick,
-            position = position
-        });
-
-        if (inputBuffer.Count > BUFFER_SIZE)
-        {
-            inputBuffer.RemoveAt(0);
-            stateBuffer.RemoveAt(0);
-        }
-    }
-
-    private void Simulate(Vector2 inputDirection, out Vector2 position, out Vector2 velocity)
-    {
-        Vector2 currentPosition = rb.position;
-        velocity = inputDirection * moveSpeed;
-        position = currentPosition + velocity * Time.fixedDeltaTime;
-        rb.MovePosition(position);
-    }
-
-    [ServerRpc]
-    private void SubmitInputServerRpc(Vector2 inputDirection, int tick, ServerRpcParams serverRpcParams = default) // 🔥 ADD tick
+    public void ForceServerSpawnState(Vector2 position, Quaternion rotation)
     {
         if (!IsServer)
         {
             return;
         }
 
-        Vector2 position;
-        Vector2 velocity;
+        transform.SetPositionAndRotation(position, rotation);
+        rb.position = position;
+        rb.rotation = rotation.eulerAngles.z;
+        rb.velocity = Vector2.zero;
+        rb.angularVelocity = 0f;
 
-        Simulate(inputDirection, out position, out velocity);
+        currentInput = Vector2.zero;
+        inputBuffer.Clear();
 
-        BroadcastStateClientRpc(position, velocity, tick); // 🔥 gửi tick
+        StatePayload spawnState = new StatePayload
+        {
+            tick = localTick,
+            position = position,
+            velocity = Vector2.zero
+        };
+
+        serverState.Value = spawnState;
+        lastProcessedState = spawnState;
     }
 
-    [ClientRpc]
-    private void BroadcastStateClientRpc(Vector2 position, Vector2 velocity, int tick) // 🔥 ADD tick
+    private void Update()
     {
-        if (IsOwner && !IsServer)
+        if (!IsSpawned) return;
+
+        if (IsOwner)
         {
-            lastServerTick = tick; // 🔥 ADD
+            currentInput = Vector2.zero;
+            if (Input.GetKey(inputUp)) currentInput = Vector2.up;
+            else if (Input.GetKey(inputDown)) currentInput = Vector2.down;
+            else if (Input.GetKey(inputLeft)) currentInput = Vector2.left;
+            else if (Input.GetKey(inputRight)) currentInput = Vector2.right;
 
-            rb.position = position;
-
-            Vector2 visualDirection = velocity.sqrMagnitude > 0f ? velocity.normalized : Vector2.zero;
-            playerVisual?.SetMovement(visualDirection);
-            return;
+            playerVisual?.SetMovement(currentInput);
         }
-
-        if (!IsOwner)
+        else
         {
-            remoteTargetPosition = position;
-            remoteVelocity = velocity;
+            // 🔥 SMOOTHING CHO CÁC CLIENT KHÁC
+            rb.position = Vector2.Lerp(rb.position, serverState.Value.position, remotePositionLerp * Time.deltaTime);
 
-            if (!hasRemoteState)
+            Vector2 visualDirection = serverState.Value.velocity.sqrMagnitude > 0f ? serverState.Value.velocity.normalized : Vector2.zero;
+            playerVisual?.SetMovement(visualDirection);
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (!IsSpawned) return;
+
+        if (IsOwner)
+        {
+            localTick++;
+            InputPayload inputPayload = new InputPayload { tick = localTick, direction = currentInput };
+
+            if (IsServer)
             {
-                rb.position = remoteTargetPosition;
+                // LÀ HOST: Vừa là Server vừa là Client, xử lý luôn không cần dùng RPC
+                SimulateLocal(inputPayload.direction);
+                serverState.Value = new StatePayload
+                {
+                    tick = localTick,
+                    position = rb.position,
+                    velocity = inputPayload.direction * moveSpeed
+                };
             }
+            else
+            {
+                // LÀ CLIENT: Predict, Gửi Input, Reconcile
+                inputBuffer.Add(inputPayload);
+                SimulateLocal(inputPayload.direction);
 
-            hasRemoteState = true;
-
-            Vector2 visualDirection = remoteVelocity.sqrMagnitude > 0f ? remoteVelocity.normalized : Vector2.zero;
-            playerVisual?.SetMovement(visualDirection);
+                SubmitInputServerRpc(inputPayload);
+                Reconcile();
+            }
         }
+    }
+
+    private void SimulateLocal(Vector2 dir)
+    {
+        Vector2 vel = dir * moveSpeed;
+        // Dùng cộng position thay vì rb.MovePosition để toán học đồng bộ chuẩn xác trong lúc Replay
+        rb.position += vel * Time.fixedDeltaTime;
+    }
+
+    [ServerRpc]
+    private void SubmitInputServerRpc(InputPayload input)
+    {
+        // Server xử lý input của Client
+        Vector2 vel = input.direction * moveSpeed;
+        rb.position += vel * Time.fixedDeltaTime;
+
+        serverState.Value = new StatePayload
+        {
+            tick = input.tick,
+            position = rb.position,
+            velocity = vel
+        };
     }
 
     // 🔥 CORE RECONCILE
     private void Reconcile()
     {
-        if (lastServerTick == 0) return;
+        StatePayload latestServerState = serverState.Value;
 
-        int index = stateBuffer.FindIndex(s => s.tick == lastServerTick);
-        if (index == -1) return;
+        // Chưa có dữ liệu mới từ server
+        if (latestServerState.tick == 0 || latestServerState.tick == lastProcessedState.tick) return;
 
-        Vector2 serverPos = rb.position;
-        Vector2 localPos = stateBuffer[index].position;
+        lastProcessedState = latestServerState;
 
-        float error = Vector2.Distance(localPos, serverPos);
+        // Xóa các input đã được server xử lý thành công
+        inputBuffer.RemoveAll(i => i.tick <= latestServerState.tick);
 
-        if (error < 0.01f) return;
+        // Tính toán vị trí đáng lẽ phải ở đó theo góc nhìn xác thực từ server
+        Vector2 expectedPos = latestServerState.position;
 
-        // rollback
-        rb.position = serverPos;
-
-        // remove old
-        inputBuffer.RemoveRange(0, index + 1);
-        stateBuffer.RemoveRange(0, index + 1);
-
-        // replay
+        // Replay lại các input mà server chưa kịp xử lý
         foreach (var input in inputBuffer)
         {
-            Vector2 pos;
-            Vector2 vel;
-            Simulate(input.direction, out pos, out vel);
+            expectedPos += (input.direction * moveSpeed) * Time.fixedDeltaTime;
+        }
+
+        float error = Vector2.Distance(rb.position, expectedPos);
+        float snapThreshold = 1.0f;
+
+        if (error > 0.05f) // Bỏ qua sai số siêu nhỏ để không giật cục
+        {
+            if (error > snapThreshold)
+            {
+                rb.position = expectedPos;
+            }
+            else
+            {
+                rb.position = Vector2.Lerp(rb.position, expectedPos, 0.5f);
+            }
         }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        if (!IsServer) return; // Chỉ Server mới được xử lý logic va chạm nguy hiểm để tránh client tự ý đoán sai
+
         if (other.gameObject.layer == LayerMask.NameToLayer("Explosion"))
         {
-            DeathSequence();
-            playerVisual?.SetDead(true);
+            DeathSequenceClientRpc();
         }
     }
 
-    private void DeathSequence()
+    [ClientRpc]
+    private void DeathSequenceClientRpc()
     {
         enabled = false;
-        GetComponent<BombController>().enabled = false;
+        var bombController = GetComponent<BombController>();
+        if (bombController != null) bombController.enabled = false;
+
         playerVisual?.SetSortingOrder(1);
-        GetComponent<Collider2D>().enabled = false;
+        var col = GetComponent<Collider2D>();
+        if (col != null) col.enabled = false;
+
+        playerVisual?.SetDead(true);
         Invoke(nameof(OnDeathSequenceEnded), 1.25f);
     }
 
     private void OnDeathSequenceEnded()
     {
-        Debug.Log("Player has died. Implement death handling logic here.");
+        Debug.Log("Player has died.");
     }
 }

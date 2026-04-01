@@ -6,34 +6,34 @@ using UnityEngine.UI;
 
 public class NetworkManagerUI : MonoBehaviour
 {
-
     [SerializeField] private Button serverBtn;
     [SerializeField] private Button hostBtn;
     [SerializeField] private Button clientBtn;
 
     private void Awake()
     {
-        serverBtn.onClick.AddListener(() => {
-            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
+        serverBtn.onClick.AddListener(() =>
+        {
+            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening && PlayersManager.Instance != null)
             {
                 NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
                 NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-
                 NetworkManager.Singleton.StartServer();
             }
         });
 
-        hostBtn.onClick.AddListener(() => {
-            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
+        hostBtn.onClick.AddListener(() =>
+        {
+            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening && PlayersManager.Instance != null)
             {
                 NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
                 NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-
                 NetworkManager.Singleton.StartHost();
             }
         });
 
-        clientBtn.onClick.AddListener(() => {
+        clientBtn.onClick.AddListener(() =>
+        {
             if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
             {
                 NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
