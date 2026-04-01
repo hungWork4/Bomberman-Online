@@ -14,15 +14,31 @@ public class NetworkManagerUI : MonoBehaviour
     private void Awake()
     {
         serverBtn.onClick.AddListener(() => {
-            NetworkManager.Singleton.StartServer();
+            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
+                NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+
+                NetworkManager.Singleton.StartServer();
+            }
         });
 
         hostBtn.onClick.AddListener(() => {
-            NetworkManager.Singleton.StartHost();
+            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
+                NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+
+                NetworkManager.Singleton.StartHost();
+            }
         });
 
         clientBtn.onClick.AddListener(() => {
-            NetworkManager.Singleton.StartClient();
+            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+                NetworkManager.Singleton.StartClient();
+            }
         });
     }
 }
