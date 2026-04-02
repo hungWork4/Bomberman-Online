@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -20,12 +20,59 @@ public class Bombit : NetworkBehaviour
     public bool HasExploded => hasExploded;
 
     private Tilemap assignedDestructibleTiles;
-    private int assignedExplosionRadius = 1;
+    //private int assignedExplosionRadius = 1;
+    private NetworkVariable<int> assignedExplosionRadius = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public override void OnNetworkSpawn()
+    {
+        ResolveDestructibleTilemap();
+    }
+    private bool ResolveDestructibleTilemap()
+    {
+        if (assignedDestructibleTiles != null)
+        {
+            return true;
+        }
+
+        Transform stage = GameObject.Find("Stage")?.transform;
+        if (stage == null)
+        {
+            return false;
+        }
+
+        Transform destructibles = FindDeepChild(stage, "Destructibles");
+        if (destructibles == null)
+        {
+            return false;
+        }
+
+        assignedDestructibleTiles = destructibles.GetComponent<Tilemap>();
+        return assignedDestructibleTiles != null;
+    }
+
+    private static Transform FindDeepChild(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name)
+            {
+                return child;
+            }
+
+            Transform result = FindDeepChild(child, name);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
 
     public void Initialize(Tilemap destructibleTiles, int explosionRadius)
     {
+        if (!IsServer) return;
         assignedDestructibleTiles = destructibleTiles;
-        assignedExplosionRadius = explosionRadius;
+        assignedExplosionRadius.Value = explosionRadius;
     }
 
     public void bombexplosion(Vector2 position, Tilemap destructibleTiles, int explosionRadius)
@@ -61,7 +108,7 @@ public class Bombit : NetworkBehaviour
         }
         if (Physics2D.OverlapBox(position, Vector2.one / 2f, 0f, explosionLayerMask))
         {
-            ClearDestructible(position, destructibleTiles);
+            ClearDestructibleServerRpc(position);
             return;
         }
 
@@ -96,7 +143,7 @@ public class Bombit : NetworkBehaviour
         position.x = Mathf.Round(position.x);
         position.y = Mathf.Round(position.y);
 
-        bombexplosion(position, assignedDestructibleTiles, assignedExplosionRadius + 1);
+        bombexplosion(position, assignedDestructibleTiles, assignedExplosionRadius.Value + 1);
         this.GetComponent<NetworkObject>().Despawn();
         Destroy(gameObject);
     }
@@ -125,28 +172,42 @@ public class Bombit : NetworkBehaviour
 
         return true;
     }
-    private void ClearDestructible(Vector2 position, Tilemap destructibleTiles)
+    [ServerRpc]
+    private void ClearDestructibleServerRpc(Vector2 position)
     {
-        Vector3Int cell = destructibleTiles.WorldToCell(position);
-        TileBase tile = destructibleTiles.GetTile(cell);
-
-        if (tile != null)
+        if (!ResolveDestructibleTilemap())
         {
-            Instantiate(destructiblePrefab, position, Quaternion.identity);
-            destructibleTiles.SetTile(cell, null);
+            return;
         }
-        //if (tile != null)
-        //{
-        //    destructibleTiles.SetColliderType(cell, Tile.ColliderType.None);
-        //    destructibleTiles.SetTile(cell, null);
 
-        //    if (destructibleTiles.GetComponent<TilemapCollider2D>() != null)
-        //    {
-        //        destructibleTiles.GetComponent<TilemapCollider2D>().ProcessTilemapChanges();
-        //    }
+        Vector3Int cell = assignedDestructibleTiles.WorldToCell(position);
+        TileBase tile = assignedDestructibleTiles.GetTile(cell);
 
-        //    Instantiate(destructiblePrefab, position, Quaternion.identity);
-        //}
+        if (tile == null)
+        {
+            return;
+        }
+
+        // Server cũng phải clear tile
+        assignedDestructibleTiles.SetTile(cell, null);
+        assignedDestructibleTiles.RefreshTile(cell);
+
+        Destructible spawned = Instantiate(destructiblePrefab, position, Quaternion.identity);
+        spawned.GetComponent<NetworkObject>().Spawn();
+
+        ClearTileVisualClientRpc(position);
     }
 
+    [ClientRpc]
+    private void ClearTileVisualClientRpc(Vector2 position)
+    {
+        if (!ResolveDestructibleTilemap())
+        {
+            return;
+        }
+
+        Vector3Int cell = assignedDestructibleTiles.WorldToCell(position);
+        assignedDestructibleTiles.SetTile(cell, null);
+        assignedDestructibleTiles.RefreshTile(cell);
+    }
 }

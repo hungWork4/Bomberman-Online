@@ -1,6 +1,8 @@
+using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
-public class Destructible : MonoBehaviour
+public class Destructible : NetworkBehaviour
 {
     public float destructionTime = 1f;
     [Range(0f, 1f)]
@@ -9,16 +11,33 @@ public class Destructible : MonoBehaviour
 
     private void Start()
     {
-        Destroy(gameObject, destructionTime);
+        //Destroy(gameObject, destructionTime);
+        DestroyAfterClientRpc(destructionTime);
     }
-
-    private void OnDestroy()
+    [ClientRpc]
+    public void DestroyAfterClientRpc(float seconds)
     {
-        if (spawnableItems.Length > 0 && Random.value < itemSpawnChance)
+        StartCoroutine(DeSpawnCoroutine(seconds));
+    }
+    private IEnumerator DeSpawnCoroutine(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        if (IsServer)
         {
-            int randomIndex = Random.Range(0, spawnableItems.Length);
-            Instantiate(spawnableItems[randomIndex], transform.position, Quaternion.identity);
+            if (spawnableItems.Length > 0 && Random.value < itemSpawnChance && IsServer)
+            {
+                int randomIndex = Random.Range(0, spawnableItems.Length);
+                var item = Instantiate(spawnableItems[randomIndex], transform.position, Quaternion.identity);
+                Debug.Log("Spawned item: " + item.name);
+                item.gameObject.GetComponent<NetworkObject>().Spawn();
+            }
+            GetComponent<NetworkObject>().Despawn();
+            Destroy(gameObject);
         }
     }
+    //public override void OnDestroy()
+    //{
+
+    //}
 
 }

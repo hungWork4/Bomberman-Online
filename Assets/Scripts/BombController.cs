@@ -12,12 +12,12 @@ public class BombController : NetworkBehaviour
     [SerializeField] private int bombAmount = 1;
     //[SerializeField] private int bombsRemaining;
     private NetworkVariable<int> bombsRemaining = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    [SerializeField] private int explosionRadius = 1;
-    public int ExplosionRadius { get => explosionRadius; set => explosionRadius = value; }
+    //[SerializeField] private int explosionRadius = 1;
+    [SerializeField] private NetworkVariable<int> explosionRadius = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public int ExplosionRadius { get => explosionRadius.Value; set => explosionRadius.Value = value; }
 
     [Header("Destructible")]
     public Tilemap destructibleTiles;
-    public Destructible destructiblePrefab;
 
     private void OnEnable()
     {
@@ -67,6 +67,7 @@ public class BombController : NetworkBehaviour
     {
         StartCoroutine(PlaceBomb());
     }
+    
     private IEnumerator PlaceBomb()
     {
         Vector2 position = transform.position;

@@ -6,8 +6,8 @@ using System.Collections.Generic;
 public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
-    public float moveSpeed = 5f;
-
+    [SerializeField]private NetworkVariable<float> _movespeed = new NetworkVariable<float>(5f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public float moveSpeed { get => _movespeed.Value; set => _movespeed.Value = value; }
     [Header("Remote Sync")]
     [SerializeField] private float remotePositionLerp = 16f;
 

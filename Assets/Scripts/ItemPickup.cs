@@ -1,6 +1,7 @@
+using Unity.Netcode;
 using UnityEngine;
 
-public class ItemPickup : MonoBehaviour
+public class ItemPickup : NetworkBehaviour
 {
     public enum ItemType
     {
@@ -27,14 +28,20 @@ public class ItemPickup : MonoBehaviour
                 player.GetComponent<PlayerController>().moveSpeed++;
                 break;
         }
-
+        this.GetComponent<NetworkObject>().Despawn();
         Destroy(gameObject);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player")) {
-            OnItemPickup(other.gameObject);
+        if (!IsServer) return;
+        if (other.CompareTag("Player"))
+        {
+            if (other.TryGetComponent<NetworkObject>(out var playerNetworkObj))
+            {
+                OnItemPickup(other.gameObject);
+                //GetComponent<NetworkObject>().Despawn();
+            }
         }
     }
 
