@@ -9,7 +9,7 @@ public class PlayerVisual : MonoBehaviour
 
     private Animator anim;
     private SpriteRenderer spriteRenderer;
-    private Vector2 lastDirection = new Vector2(0f, -1f);
+    [HideInInspector]public Vector2 lastDirection = new Vector2(0f, -1f);
 
     private readonly int animMoveX = Animator.StringToHash("MoveX");
     private readonly int animMoveY = Animator.StringToHash("MoveY");

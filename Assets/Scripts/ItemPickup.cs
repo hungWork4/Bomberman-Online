@@ -14,28 +14,65 @@ public class ItemPickup : NetworkBehaviour
 
     private void OnItemPickup(GameObject player)
     {
-        switch (type)
+        try
         {
-            case ItemType.ExtraBomb:
-                player.GetComponent<BombController>().AddBomb();
-                break;
+            var bombController = player.GetComponent<BombController>();
+            var playerController = player.GetComponent<PlayerController>();
+            var aiController = player.GetComponent<BombermanAI>();
 
-            case ItemType.BlastRadius:
-                player.GetComponent<BombController>().ExplosionRadius++;
-                break;
+            switch (type)
+            {
+                case ItemType.ExtraBomb:
+                    if (bombController != null)
+                    {
+                        bombController.AddBomb();
+                    }
+                    else if (aiController != null)
+                    {
+                        aiController.AddBomb();
+                    }
+                    break;
 
-            case ItemType.SpeedIncrease:
-                player.GetComponent<PlayerController>().moveSpeed++;
-                break;
+                case ItemType.BlastRadius:
+                    if (bombController != null)
+                    {
+                        bombController.ExplosionRadius++;
+                    }
+                    else if (aiController != null)
+                    {
+                        aiController.AddBlastRadius();
+                    }
+                    break;
+
+                case ItemType.SpeedIncrease:
+                    if (playerController != null)
+                    {
+                        playerController.moveSpeed++;
+                    }
+                    else if (aiController != null)
+                    {
+                        aiController.AddMoveSpeed();
+                    }
+                    break;
+            }
+            this.GetComponent<NetworkObject>().Despawn();
+            Destroy(gameObject);
         }
-        this.GetComponent<NetworkObject>().Despawn();
-        Destroy(gameObject);
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Error applying item effect: {e.Message}");
+        }
+        
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!IsServer) return;
-        if (other.CompareTag("Player"))
+
+        bool canReceiveItem = other.CompareTag("Player") ||
+                              other.GetComponent<BombermanAI>() != null;
+
+        if (canReceiveItem)
         {
             if (other.TryGetComponent<NetworkObject>(out var playerNetworkObj))
             {

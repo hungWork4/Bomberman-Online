@@ -28,7 +28,7 @@ public class Destructible : NetworkBehaviour
             {
                 int randomIndex = Random.Range(0, spawnableItems.Length);
                 var item = Instantiate(spawnableItems[randomIndex], transform.position, Quaternion.identity);
-                Debug.Log("Spawned item: " + item.name);
+                Debug.Log("Spawned item: " );
                 item.gameObject.GetComponent<NetworkObject>().Spawn();
             }
             GetComponent<NetworkObject>().Despawn();

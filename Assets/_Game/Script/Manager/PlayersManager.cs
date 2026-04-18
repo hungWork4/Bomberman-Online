@@ -143,4 +143,50 @@ public class PlayersManager : NetworkBehaviour
 
         trackedClients.Add(clientId);
     }
+
+    public bool TryGetEmptySpawnPoint(out Transform emptySpawnPoint)
+    {
+        emptySpawnPoint = null;
+
+        if (spawnPoints == null || spawnPoints.Count == 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < spawnPoints.Count; i++)
+        {
+            Transform spawnPoint = spawnPoints[i];
+            if (spawnPoint == null)
+            {
+                continue;
+            }
+
+            bool occupied = false;
+            for (int p = 0; p < players.Count; p++)
+            {
+                PlayerController player = players[p];
+                if (player == null || player.NetworkObject == null || !player.NetworkObject.IsSpawned)
+                {
+                    continue;
+                }
+
+                Vector2 playerPos = player.transform.position;
+                Vector2 spawnPos = spawnPoint.position;
+                if (Mathf.RoundToInt(playerPos.x) == Mathf.RoundToInt(spawnPos.x) &&
+                    Mathf.RoundToInt(playerPos.y) == Mathf.RoundToInt(spawnPos.y))
+                {
+                    occupied = true;
+                    break;
+                }
+            }
+
+            if (!occupied)
+            {
+                emptySpawnPoint = spawnPoint;
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

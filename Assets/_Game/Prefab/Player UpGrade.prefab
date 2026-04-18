@@ -48,6 +48,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   visualCorrectionReturnSpeed: 24
   maxVisualOffset: 0.35
+  lastDirection: {x: 0, y: -1}
 --- !u!212 &1776151943379500506
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -191,16 +192,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 256a4fdee14948b42b94dbfee8f1781f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 7
-  obstacleLayer:
-    serializedVersion: 2
-    m_Bits: 64
-  collisionRadius: 0.35
-  cornerCorrectionSpeed: 3
-  reconciliationThreshold: 0.05
-  snapCorrectionDistance: 0.3
-  tickRate: 30
-  maxBufferSize: 120
+  _movespeed:
+    m_InternalValue: 5
   remotePositionLerp: 16
   playerVisual: {fileID: 256391763709568723}
   inputUp: 119
@@ -223,10 +216,9 @@ MonoBehaviour:
   bombPrefab: {fileID: 3939017888894637700, guid: e10230ffd5e90c3489946b2652130401, type: 3}
   bombFuseTime: 3
   bombAmount: 2
-  bombsRemaining: 0
-  explosionRadius: 1
+  explosionRadius:
+    m_InternalValue: 2
   destructibleTiles: {fileID: 0}
-  destructiblePrefab: {fileID: -8738203639632321532, guid: 1ac7a5f8ae90ed04aa34c0753307c241, type: 3}
 --- !u!58 &4786881655137900285
 CircleCollider2D:
   m_ObjectHideFlags: 0

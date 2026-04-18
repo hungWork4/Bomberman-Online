@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using DG.Tweening;
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -16,12 +18,18 @@ public class Bombit : NetworkBehaviour
     public LayerMask bombLayerMask;
 
     private bool hasExploded;
-
     public bool HasExploded => hasExploded;
+
+    [Header("Push Settings")]
+    public float pushDistance = 4f;
+    public float pushDuration = 0.4f; // Thời gian lướt (thay vì speed)
+    public LayerMask obstacleLayer;
+
+    private Tween pushTween;
 
     private Tilemap assignedDestructibleTiles;
     //private int assignedExplosionRadius = 1;
-    private NetworkVariable<int> assignedExplosionRadius = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int> assignedExplosionRadius = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public override void OnNetworkSpawn()
     {
         ResolveDestructibleTilemap();
@@ -77,6 +85,7 @@ public class Bombit : NetworkBehaviour
 
     public void bombexplosion(Vector2 position, Tilemap destructibleTiles, int explosionRadius)
     {
+        if (pushTween != null) pushTween.Kill();
         if (hasExploded)
         {
             return;
@@ -210,4 +219,41 @@ public class Bombit : NetworkBehaviour
         assignedDestructibleTiles.SetTile(cell, null);
         assignedDestructibleTiles.RefreshTile(cell);
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestPushServerRpc(Vector2 direction)
+    {
+        if ((pushTween != null && pushTween.IsActive()) || hasExploded) return;
+
+        Vector2 startPos = transform.position;
+        GetComponent<Collider2D>().enabled = false;
+        RaycastHit2D hit = Physics2D.BoxCast(startPos, Vector2.one * 0.6f, 0f, direction, pushDistance, obstacleLayer);
+        GetComponent<Collider2D>().enabled = true; //tắt tạm thời tránh quét phải chính bomb bản thân
+        string objectTag = "";
+        if (hit.collider!=null)
+            objectTag = hit.collider.tag;
+        //float actualDist =((hit.collider != null && hit.collider.gameObject.layer != 6) || (objectTag == "Destructible" 
+        //    && hit.collider.gameObject.layer == 6)) ? Mathf.Floor(hit.distance) : pushDistance;
+        float actualDist = hit.collider != null  ? Mathf.Floor(hit.distance) : pushDistance;
+        Vector2 targetPos = startPos + direction * actualDist;
+
+        // Snap tọa độ để khớp Grid
+        targetPos = new Vector2(Mathf.Round(targetPos.x), Mathf.Round(targetPos.y));
+
+        // Gọi Client để tất cả cùng thấy mượt
+        StartPushClientRpc(targetPos);
+    }
+
+    [ClientRpc]
+    private void StartPushClientRpc(Vector2 target)
+    {
+        // Dùng DOTween để di chuyển
+        // LƯU Ý: Dùng DOMove thay vì DOAnchorPos cho World Space
+        pushTween = transform.DOMove(target, pushDuration)
+            .SetEase(Ease.OutQuad) // Tạo hiệu ứng lướt nhanh rồi chậm lại một chút cho tự nhiên
+            .OnComplete(() => {
+                transform.position = target; // Đảm bảo vị trí chính xác tuyệt đối khi xong
+            });
+    }
+
 }

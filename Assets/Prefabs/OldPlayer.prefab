@@ -17,7 +17,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &3318648983799687470
 Transform:
   m_ObjectHideFlags: 0
@@ -125,7 +125,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5879614339651246096
 Transform:
   m_ObjectHideFlags: 0
@@ -231,7 +231,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5879614340254676633
 Transform:
   m_ObjectHideFlags: 0
@@ -337,7 +337,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5879614340345886140
 Transform:
   m_ObjectHideFlags: 0
@@ -443,7 +443,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5879614341129601273
 Transform:
   m_ObjectHideFlags: 0
@@ -544,6 +544,7 @@ GameObject:
   - component: {fileID: 5879614341149993125}
   - component: {fileID: 5879614341149993123}
   - component: {fileID: 5879614341149993122}
+  - component: {fileID: 2357263208887850028}
   - component: {fileID: 5879614341149993121}
   m_Layer: 3
   m_Name: OldPlayer
@@ -656,6 +657,27 @@ MonoBehaviour:
   spriteRendererLeft: {fileID: 5879614339651246098}
   spriteRendererRight: {fileID: 5879614341129601275}
   spriteRendererDeath: {fileID: 6933967370136482323}
+--- !u!114 &2357263208887850028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5879614341149993150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 3678161591
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &5879614341149993121
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -672,11 +694,6 @@ MonoBehaviour:
   bombPrefab: {fileID: 3939017888894637700, guid: e10230ffd5e90c3489946b2652130401, type: 3}
   bombFuseTime: 3
   bombAmount: 1
-  explosionPrefab: {fileID: 805732483383335703, guid: 7d7e9c7ce1308484e863a8b4489e090f, type: 3}
-  explosionLayerMask:
-    serializedVersion: 2
-    m_Bits: 64
-  explosionDuration: 1
-  explosionRadius: 1
+  explosionRadius:
+    m_InternalValue: 1
   destructibleTiles: {fileID: 0}
-  destructiblePrefab: {fileID: -8738203639632321532, guid: 1ac7a5f8ae90ed04aa34c0753307c241, type: 3}

@@ -67,7 +67,22 @@ public class PlayerController : NetworkBehaviour
     private List<InputPayload> inputBuffer = new List<InputPayload>();
     private int localTick;
     private StatePayload lastProcessedState;
+    private Bombit touchingBomb = null;
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.layer == 7 && collision.collider.isTrigger==false)
+        {
+            touchingBomb = collision.gameObject.GetComponent<Bombit>();
+        }
+    }
 
+    private void OnCollisionExit2D(Collision2D collision)
+    {
+        if (collision.gameObject.layer == 7 && collision.collider.isTrigger == false)
+        {
+            touchingBomb = null;
+        }
+    }
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -139,6 +154,11 @@ public class PlayerController : NetworkBehaviour
             else if (Input.GetKey(inputRight)) currentInput = Vector2.right;
 
             playerVisual?.SetMovement(currentInput);
+
+            if (Input.GetKeyDown(KeyCode.LeftShift) && touchingBomb != null)
+            {
+                touchingBomb.RequestPushServerRpc(playerVisual.lastDirection);
+            }
         }
         else
         {
