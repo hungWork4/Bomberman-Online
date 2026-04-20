@@ -5,7 +5,9 @@
   <Project Path="ParrelSync.csproj" />
   <Project Path="IngameDebugConsole.Runtime.csproj" />
   <Project Path="DOTween.Modules.csproj" />
+  <Project Path="Sirenix.OdinInspector.Modules.Unity.Addressables.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="VFolders.csproj" />
   <Project Path="IngameDebugConsole.Editor.csproj" />
   <Project Path="Sirenix.OdinInspector.Modules.UnityMathematics.csproj" />
 </Solution>

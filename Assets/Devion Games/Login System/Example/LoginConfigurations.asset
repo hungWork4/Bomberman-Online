@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   skipLogin: 0
   loadSceneOnLogin: 1
-  sceneToLoad: Game
+  sceneToLoad: MainMenu
   debug: 1
 --- !u!114 &-6335041345592972870
 MonoBehaviour:
@@ -30,6 +30,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   serverAddress: https://lndnirkrfjwriofnylks.supabase.co
   supabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZG5pcmtyZmp3cmlvZm55bGtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDIwNzUsImV4cCI6MjA5MTY3ODA3NX0.fGKMP19jLJWxQhZcRV2cG7C_ibVGsTLBe87373FUpB8
+  usernameLookupRpc: resolve_login_email
+  usernameLookupParameter: p_username
+  resolvedEmailField: email
+  profileTable: player_profiles
+  profileUsernameField: username
+  profileEmailField: email
+  profileDisplayNameField: display_name
   accountKey: Account
   accessTokenKey: SupabaseAccessToken
   refreshTokenKey: SupabaseRefreshToken

@@ -1,0 +1,233 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: adb9c12a8c6c949f7af83a3d238359d0, type: 3}
+  m_Name: vFolders Data
+  m_EditorClassIdentifier: 
+  folderDatas_byGuid:
+    keys:
+    - b9a0f7f7d836c3b4aacdd431443daa44
+    - 98951132346795f438babe7a3183da43
+    - fa98b3119e27e714eaacca7fded830d4
+    - 56a35bcbe6fb7ec43bed20fea5f0f39c
+    - 2d747c2294bb40f43915705da040a1b8
+    - 3a23e48ac964b8d4cab65d2983732395
+    - 0b31d124a34f94241b3b5fbaa8745367
+    - 008c785d69c32d049971f929afc5dee8
+    - ba10ae76bede75a48819a8ec4e53635b
+    - bed56fdee2224e74689d9ccaa4df0af5
+    - 7847eac26754e454487f8e2d69c50923
+    - 715a921c1f69bcc41ab3a323e6775aad
+    - d0681cea807663b44a259697e5a37663
+    - 7dc41542869feac4f94d48edce042594
+    - 34070cf951808d5489a691a27148e89e
+    - 2126c42a6fbd73c4f8cc8524a15ae46c
+    - 578721c65b35d184592876b46852cd2b
+    - 7e72086b618867f41ae8f8835a6c8c8f
+    - b0287d572f9fc8a4180ad224f13c9b50
+    - deffbaff7734b804bb690588af8f98c9
+    - f1add9d51559e6f49ae4503721a5e753
+    - 850b5ab2c0d031844abc98a0a0dbedff
+    - ed0da85d9c1e1464f8bbf9e63e78ddcf
+    - 8e1d92ccdaf42a646af84781793510eb
+    - f4011b9be4baa924ea155e09ca47efb6
+    - 72f6b22034ac0c24aa2b70f133af25ce
+    - 1dcff131f9420b6428076d3375c56e71
+    - bd72e4feb03923f4d871698697f18652
+    - 060d817b655ea0c4c9d839dfa46f9746
+    - 61d93876461f0434fa1487a6b91828f6
+    - 5a0cbb74f6b1b684c8fdd749716d5020
+    - 88a823a9d7e8c444bbca18c6a8f09c01
+    - b7b76564d7a24f74e987251fac10ee49
+    - 79b7c128ead3cdd428e965edf374ba4a
+    - ae2db98f122c58e44b9a16f5e3ae608c
+    - 2207ce9f4ee9a2847bc129093de9e187
+    - b02b97659a3f4e848843277d729ad4b1
+    - 8e512a2c34d00594989640c8a9ac2df2
+    - ee58ddcb30368b04cb67dab61da7cbfc
+    - 86dcb93209214a14f8e5487abaaac8a1
+    - 4c3f44f620c833c479233ce4c943febb
+    - b00c40cad0d6865409a4424c73b0e3e4
+    values:
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 7
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 4
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 4
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 4
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 4
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 1
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: Prefab Icon
+      colorIndex: 6
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: PrefabModel Icon
+      colorIndex: 10
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: RawImage Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: AssemblyDefinitionAsset Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: Material Icon
+      colorIndex: 3
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: Prefab Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: Prefab Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: Prefab Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ComputeShader Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: ScriptableObject Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: Prefab Icon
+      colorIndex: 0
+      isIconRecursive: 0
+      isColorRecursive: 0
+  bookmarks:
+  - guid: 29618e511557bf944b08c4268e682669
+  - guid: 5f5eda29e058f5f439653bb48480194c
+  - guid: 02dd79c1edff6de4898c49742f48c526
+  - guid: 44e65de592a98c9439cc4b04de9cd3d1
+  - guid: c490f69cedc1155439159c55aa8088af

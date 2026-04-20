@@ -5,16 +5,14 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/Scenes/SampleScene.unity
-    guid: 8c9cfa26abfee488c85f1582747f6a02
   - enabled: 1
-    path: Assets/_Game/Scene/Game.unity
-    guid: e932b8942c3e88c4c8417c0bb474b1ac
+    path: Assets/_Game/Scene/Login.unity
+    guid: 07b1686664198be49b09f2c6aed5851c
   - enabled: 1
-    path: Assets/Scenes/Bomberman.unity
-    guid: 2267148e34104cb4c83c0338fa07b1a2
+    path: Assets/_Game/Scene/MainMenu.unity
+    guid: 2bd73912301f0d543a50b5f7e66430b8
   - enabled: 1
-    path: Assets/Devion Games/Login System/Example/Scenes/Login Example.unity
-    guid: 068cb1845a775634d9eb5773fe2d3eb3
-  m_configObjects: {}
+    path: Assets/_Game/Scene/Bomberman.unity
+    guid: 75d5736dcea5f8647816c5d93d9a6357
+  m_configObjects:
+    com.unity.addressableassets: {fileID: 11400000, guid: ca291e3ef41aaa94cb9e27868b4a25b5, type: 2}
