@@ -9,16 +9,18 @@ using Unity.Collections;
 public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField]private NetworkVariable<float> _movespeed = new NetworkVariable<float>(5f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    [SerializeField] private NetworkVariable<float> _movespeed = new NetworkVariable<float>(5f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public float moveSpeed { get => _movespeed.Value; set => _movespeed.Value = value; }
+    
     [Header("Remote Sync")]
-    [SerializeField] private float remotePositionLerp = 16f;
+    [SerializeField] private float remotePositionLerp = 15f;
 
     [Header("References")]
     private PlayerVisual playerVisual;
-
     private Rigidbody2D rb;
     private Vector2 currentInput;
+    private Vector2 lastSentInput;// client
+    private Vector2 hostLastInput;
 
     [Header("Input")]
     public KeyCode inputUp = KeyCode.W;
@@ -60,7 +62,6 @@ public class PlayerController : NetworkBehaviour
         }
     }
 
-    // Sử dụng NetworkVariable để tránh Spam RPC và tự động đồng bộ cho người vào sau (Late-join)
     private NetworkVariable<StatePayload> serverState = new NetworkVariable<StatePayload>(
         new StatePayload(),
         NetworkVariableReadPermission.Everyone,
@@ -71,87 +72,34 @@ public class PlayerController : NetworkBehaviour
     private int localTick;
     private StatePayload lastProcessedState;
     private Bombit touchingBomb = null;
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.layer == 7 && collision.collider.isTrigger==false)
-        {
-            touchingBomb = collision.gameObject.GetComponent<Bombit>();
-        }
-    }
+    
+    private Vector2 _lastServerPosition;
 
     private NetworkVariable<FixedString64Bytes> _currentSkinKey = new NetworkVariable<FixedString64Bytes>(
         "", 
         NetworkVariableReadPermission.Everyone, 
-        NetworkVariableWritePermission.Server // Chỉ Server mới có quyền đổi skin
+        NetworkVariableWritePermission.Server
     );
     private AsyncOperationHandle<GameObject> _currentSkinHandle;
     private string _lastSkinKey = "";
 
-   private async void ChangeSkinByKey(string skinKey)
-    {
-        if (string.IsNullOrEmpty(skinKey) || skinKey == _lastSkinKey) return;
-
-        if (_currentSkinHandle.IsValid())
-        {
-            Addressables.ReleaseInstance(_currentSkinHandle);
-            Debug.Log($"Đã giải phóng skin cũ: {_lastSkinKey}");
-        }
-
-        _lastSkinKey = skinKey;
-        _currentSkinHandle = Addressables.InstantiateAsync(skinKey, this.transform);
-
-        await _currentSkinHandle.Task;
-
-        if (_currentSkinHandle.Status == AsyncOperationStatus.Succeeded)
-        {
-            GameObject skinObj = _currentSkinHandle.Result;
-            skinObj.transform.localPosition = Vector3.zero;
-            skinObj.transform.localRotation = Quaternion.identity;
-
-            playerVisual = skinObj.GetComponentInChildren<PlayerVisual>(true);
-            
-            Debug.Log($"[Client/Host] Spawn thành công skin: {skinKey}");
-        }
-        else
-        {
-            Debug.LogError($"Lỗi load Addressable: {skinKey}");
-            _lastSkinKey = "";
-        }
-    }
-
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        if (collision.gameObject.layer == 7 && collision.collider.isTrigger == false)
-        {
-            touchingBomb = null;
-        }
-    }
-
-    public void RequestChangeSkin(string newKey)
-    {
-        if (!IsServer) return;
-        _currentSkinKey.Value = newKey;
-    }
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        // if (playerVisual == null)
-        // {
-        //     playerVisual = GetComponentInChildren<PlayerVisual>(true);
-        // }
-
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
+        // Đảm bảo Rigidbody là Dynamic để va chạm hoạt động tốt
+        rb.bodyType = RigidbodyType2D.Dynamic;
     }
-    private void OnSkinKeyChanged(FixedString64Bytes previousValue, FixedString64Bytes newValue)
-    {
-        ChangeSkinByKey(newValue.ToString());
-    }
+
     public override void OnNetworkSpawn()
     {
         _currentSkinKey.OnValueChanged += OnSkinKeyChanged;
 
+        if (IsServer)
+        {
             _currentSkinKey.Value = "Red_Def";
+        }
 
         string initialSkinKey = _currentSkinKey.Value.ToString();
         if (!string.IsNullOrEmpty(initialSkinKey))
@@ -170,10 +118,12 @@ public class PlayerController : NetworkBehaviour
                 position = spawnedPosition,
                 velocity = Vector2.zero
             };
+            _lastServerPosition = spawnedPosition;
         }
 
         lastProcessedState = serverState.Value;
     }
+
     public override void OnNetworkDespawn()
     {
         _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
@@ -182,32 +132,6 @@ public class PlayerController : NetworkBehaviour
         {
             Addressables.ReleaseInstance(_currentSkinHandle);
         }
-    }
-    public void ForceServerSpawnState(Vector2 position, Quaternion rotation)
-    {
-        if (!IsServer)
-        {
-            return;
-        }
-
-        transform.SetPositionAndRotation(position, rotation);
-        rb.position = position;
-        rb.rotation = rotation.eulerAngles.z;
-        rb.velocity = Vector2.zero;
-        rb.angularVelocity = 0f;
-
-        currentInput = Vector2.zero;
-        inputBuffer.Clear();
-
-        StatePayload spawnState = new StatePayload
-        {
-            tick = localTick,
-            position = position,
-            velocity = Vector2.zero
-        };
-
-        serverState.Value = spawnState;
-        lastProcessedState = spawnState;
     }
 
     private void Update()
@@ -221,20 +145,23 @@ public class PlayerController : NetworkBehaviour
             else if (Input.GetKey(inputDown)) currentInput = Vector2.down;
             else if (Input.GetKey(inputLeft)) currentInput = Vector2.left;
             else if (Input.GetKey(inputRight)) currentInput = Vector2.right;
-
+            
+            if (IsServer)
+                hostLastInput = currentInput;
+            
             playerVisual?.SetMovement(currentInput);
 
             if (Input.GetKeyDown(KeyCode.LeftShift) && touchingBomb != null)
             {
                 touchingBomb.RequestPushServerRpc(playerVisual.lastDirection);
             }
+
         }
         else
         {
-            // 🔥 SMOOTHING CHO CÁC CLIENT KHÁC
-            rb.position = Vector2.Lerp(rb.position, serverState.Value.position, remotePositionLerp * Time.deltaTime);
-
-            Vector2 visualDirection = serverState.Value.velocity.sqrMagnitude > 0f ? serverState.Value.velocity.normalized : Vector2.zero;
+            // Chỉ cập nhật visual (Animation) trong Update, việc di chuyển nhường cho FixedUpdate
+            StatePayload targetState = serverState.Value;
+            Vector2 visualDirection = targetState.velocity.sqrMagnitude > 0f ? targetState.velocity.normalized : Vector2.zero;
             playerVisual?.SetMovement(visualDirection);
         }
     }
@@ -250,66 +177,106 @@ public class PlayerController : NetworkBehaviour
 
             if (IsServer)
             {
-                // LÀ HOST: Vừa là Server vừa là Client, xử lý luôn không cần dùng RPC
+                // LÀ HOST
                 SimulateLocal(inputPayload.direction);
-                serverState.Value = new StatePayload
-                {
-                    tick = localTick,
-                    position = rb.position,
-                    velocity = inputPayload.direction * moveSpeed
-                };
+                // UpdateServerState(localTick, inputPayload.direction);
+                UpdateServerState(localTick, hostLastInput);
+
             }
             else
             {
-                // LÀ CLIENT: Predict, Gửi Input, Reconcile
+                // LÀ CLIENT
                 inputBuffer.Add(inputPayload);
                 SimulateLocal(inputPayload.direction);
 
-                SubmitInputServerRpc(inputPayload);
+                if (currentInput != lastSentInput)
+                {
+                    SubmitInputServerRpc(inputPayload);
+                    lastSentInput = currentInput;
+                }
+                
                 Reconcile();
             }
+        }
+        else 
+        {
+            if (IsServer)
+            {
+                // Server tiếp tục mô phỏng hành động cuối cùng của Client
+                SimulateLocal(lastSentInput); 
+                UpdateServerState(lastProcessedState.tick, lastSentInput);
+            }
+            else
+            {
+                // 🔥 [FIX QUAN TRỌNG] Các Client khác nội suy vị trí bằng vật lý (MovePosition)
+                StatePayload targetState = serverState.Value;
+                float distance = Vector2.Distance(rb.position, targetState.position);
+
+                if (targetState.velocity.sqrMagnitude < 0.0001f && distance < 0.02f)
+                {
+                    // Đã đến nơi thì Snap để tránh trượt băng
+                    rb.MovePosition(targetState.position);
+                }
+                else
+                {
+                    // Dự đoán trước 1 tick + bám theo tốc độ động để giảm cảm giác delay khi xem host từ client
+                    Vector2 predictedPos = targetState.position + (targetState.velocity * Time.fixedDeltaTime);
+                    float followSpeed = Mathf.Max(targetState.velocity.magnitude, distance * remotePositionLerp);
+                    Vector2 nextPos = Vector2.MoveTowards(rb.position, predictedPos, followSpeed * Time.fixedDeltaTime);
+                    rb.MovePosition(nextPos);
+                }
+            }
+        }
+    }
+
+    private void UpdateServerState(int tick, Vector2 direction)
+    {
+        if (!IsServer) return;
+
+        Vector2 vel = direction * moveSpeed;
+
+        // Always push state when velocity changes (especially moving -> idle)
+        // so remote clients can stop run animation immediately.
+        bool positionChanged = Vector2.Distance(rb.position, _lastServerPosition) > 0.01f;
+        bool velocityChanged = serverState.Value.velocity != vel;
+
+        if (positionChanged || velocityChanged)
+        {
+            serverState.Value = new StatePayload
+            {
+                tick = tick,
+                position = rb.position,
+                velocity = vel
+            };
+            _lastServerPosition = rb.position;
         }
     }
 
     private void SimulateLocal(Vector2 dir)
     {
         Vector2 vel = dir * moveSpeed;
-        // Dùng cộng position thay vì rb.MovePosition để toán học đồng bộ chuẩn xác trong lúc Replay
-        rb.position += vel * Time.fixedDeltaTime;
+        // Dùng rb.MovePosition để chạy mô phỏng di chuyển đúng chuẩn vật lý của Unity
+        rb.MovePosition(rb.position + vel * Time.fixedDeltaTime);
     }
 
     [ServerRpc]
     private void SubmitInputServerRpc(InputPayload input)
     {
-        // Server xử lý input của Client
-        Vector2 vel = input.direction * moveSpeed;
-        rb.position += vel * Time.fixedDeltaTime;
-
-        serverState.Value = new StatePayload
-        {
-            tick = input.tick,
-            position = rb.position,
-            velocity = vel
-        };
+        lastSentInput = input.direction;
+        lastProcessedState.tick = input.tick;
     }
 
-    // 🔥 CORE RECONCILE
     private void Reconcile()
     {
         StatePayload latestServerState = serverState.Value;
 
-        // Chưa có dữ liệu mới từ server
         if (latestServerState.tick == 0 || latestServerState.tick == lastProcessedState.tick) return;
 
         lastProcessedState = latestServerState;
-
-        // Xóa các input đã được server xử lý thành công
         inputBuffer.RemoveAll(i => i.tick <= latestServerState.tick);
 
-        // Tính toán vị trí đáng lẽ phải ở đó theo góc nhìn xác thực từ server
         Vector2 expectedPos = latestServerState.position;
 
-        // Replay lại các input mà server chưa kịp xử lý
         foreach (var input in inputBuffer)
         {
             expectedPos += (input.direction * moveSpeed) * Time.fixedDeltaTime;
@@ -318,22 +285,39 @@ public class PlayerController : NetworkBehaviour
         float error = Vector2.Distance(rb.position, expectedPos);
         float snapThreshold = 1.0f;
 
-        if (error > 0.05f) // Bỏ qua sai số siêu nhỏ để không giật cục
+        if (error > 0.05f) 
         {
             if (error > snapThreshold)
             {
-                rb.position = expectedPos;
+                rb.position = expectedPos; // Sai số quá lớn -> Dịch chuyển thẳng
             }
             else
             {
-                rb.position = Vector2.Lerp(rb.position, expectedPos, 0.5f);
+                // Kéo mượt về vị trí đúng nhưng vẫn thông qua Rigidbody
+                rb.MovePosition(Vector2.Lerp(rb.position, expectedPos, 0.5f));
             }
+        }
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.layer == 7 && collision.collider.isTrigger == false)
+        {
+            touchingBomb = collision.gameObject.GetComponent<Bombit>();
+        }
+    }
+
+    private void OnCollisionExit2D(Collision2D collision)
+    {
+        if (collision.gameObject.layer == 7 && collision.collider.isTrigger == false)
+        {
+            touchingBomb = null;
         }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!IsServer) return; // Chỉ Server mới được xử lý logic va chạm nguy hiểm để tránh client tự ý đoán sai
+        if (!IsServer) return; 
 
         if (other.gameObject.layer == LayerMask.NameToLayer("Explosion"))
         {
@@ -359,5 +343,75 @@ public class PlayerController : NetworkBehaviour
     private void OnDeathSequenceEnded()
     {
         Debug.Log("Player has died.");
+    }
+
+    private async void ChangeSkinByKey(string skinKey)
+    {
+        if (string.IsNullOrEmpty(skinKey) || skinKey == _lastSkinKey) return;
+
+        if (_currentSkinHandle.IsValid())
+        {
+            Addressables.ReleaseInstance(_currentSkinHandle);
+        }
+
+        _lastSkinKey = skinKey;
+        _currentSkinHandle = Addressables.InstantiateAsync(skinKey, this.transform);
+
+        await _currentSkinHandle.Task;
+
+        if (_currentSkinHandle.Status == AsyncOperationStatus.Succeeded)
+        {
+            GameObject skinObj = _currentSkinHandle.Result;
+            skinObj.transform.localPosition = Vector3.zero;
+            skinObj.transform.localRotation = Quaternion.identity;
+
+            playerVisual = skinObj.GetComponentInChildren<PlayerVisual>(true);
+        }
+        else
+        {
+            Debug.LogError($"Lỗi load Addressable: {skinKey}");
+            _lastSkinKey = "";
+        }
+    }
+
+    public void RequestChangeSkin(string newKey)
+    {
+        if (!IsServer) return;
+        _currentSkinKey.Value = newKey;
+    }
+
+    private void OnSkinKeyChanged(FixedString64Bytes previousValue, FixedString64Bytes newValue)
+    {
+        ChangeSkinByKey(newValue.ToString());
+    }
+
+    [ServerRpc(RequireOwnership =false)]
+    public void ForceServerSpawnStateServerRpc(Vector2 position, Quaternion rotation)
+    {
+        if (!IsServer) return;
+        ForceServerSpawnStateClientRpc(position, rotation);
+        currentInput = Vector2.zero;
+        inputBuffer.Clear();
+
+        StatePayload spawnState = new StatePayload
+        {
+            tick = localTick,
+            position = position,
+            velocity = Vector2.zero
+        };
+
+        serverState.Value = spawnState;
+        lastProcessedState = spawnState;
+    }
+    [ClientRpc]
+    public void ForceServerSpawnStateClientRpc(Vector2 position, Quaternion rotation){
+        
+        transform.SetPositionAndRotation(position, rotation);
+        rb.position = position;
+        rb.rotation = rotation.eulerAngles.z;
+        rb.velocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+
+
     }
 }
