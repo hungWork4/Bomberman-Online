@@ -57,10 +57,10 @@ public class PlayersManager : NetworkBehaviour
             StartCoroutine(TrackPlayerWhenReady(client.ClientId));
         }
 
-        if (SceneManager.GetActiveScene().name == "Bomberman")
-        {
-            StartCoroutine(PlaceAllPlayersAtSpawnPointsWhenReady());
-        }
+        // if (SceneManager.GetActiveScene().name == "Bomberman")
+        // {
+        //     StartCoroutine(PlaceAllPlayersAtSpawnPointsWhenReady());
+        // }
     }
 
     public override void OnNetworkDespawn()
@@ -169,7 +169,7 @@ public class PlayersManager : NetworkBehaviour
             PlayerController controller = client.PlayerObject.GetComponent<PlayerController>();
             if (controller != null)
             {
-                controller.ForceServerSpawnState(spawnPoint.position, spawnPoint.rotation);
+                controller.ForceServerSpawnStateServerRpc(spawnPoint.position, spawnPoint.rotation);
             }
             else
             {
@@ -177,7 +177,6 @@ public class PlayersManager : NetworkBehaviour
             }
         }
     }
-
     private int GetOrCreateSpawnIndex(ulong clientId)
     {
         if (clientSpawnIndices.TryGetValue(clientId, out int existingIndex))
