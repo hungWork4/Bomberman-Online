@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.AddressableAssets;
+using Unity.Collections;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : NetworkBehaviour
@@ -77,56 +78,46 @@ public class PlayerController : NetworkBehaviour
             touchingBomb = collision.gameObject.GetComponent<Bombit>();
         }
     }
+
+    private NetworkVariable<FixedString64Bytes> _currentSkinKey = new NetworkVariable<FixedString64Bytes>(
+        "", 
+        NetworkVariableReadPermission.Everyone, 
+        NetworkVariableWritePermission.Server // Chỉ Server mới có quyền đổi skin
+    );
     private AsyncOperationHandle<GameObject> _currentSkinHandle;
     private string _lastSkinKey = "";
 
-    public async void ChangeSkinByKey(string skinKey)
+   private async void ChangeSkinByKey(string skinKey)
     {
-        // 1. Kiểm tra nếu skin mới trùng với skin cũ thì không làm lại
-        if (skinKey == _lastSkinKey) return;
+        if (string.IsNullOrEmpty(skinKey) || skinKey == _lastSkinKey) return;
 
-        // 2. Dọn dẹp Skin cũ nếu có
-        // Lưu ý: ReleaseInstance sẽ tự Destroy GameObject và giải phóng RAM
         if (_currentSkinHandle.IsValid())
         {
             Addressables.ReleaseInstance(_currentSkinHandle);
             Debug.Log($"Đã giải phóng skin cũ: {_lastSkinKey}");
         }
 
-        // 3. Cập nhật Key hiện tại
         _lastSkinKey = skinKey;
-
-        // 4. Spawn skin mới dựa trên Key
-        // Hàm này sẽ tìm trong hệ thống Addressables xem có Asset nào mang Key này không
         _currentSkinHandle = Addressables.InstantiateAsync(skinKey, this.transform);
 
-        // Chờ quá trình load và spawn hoàn tất
         await _currentSkinHandle.Task;
 
         if (_currentSkinHandle.Status == AsyncOperationStatus.Succeeded)
         {
             GameObject skinObj = _currentSkinHandle.Result;
-            
-            // Đưa skin về đúng vị trí trung tâm của skinParent
             skinObj.transform.localPosition = Vector3.zero;
             skinObj.transform.localRotation = Quaternion.identity;
 
-            // Gán lại visual theo skin vừa spawn để các call animation luôn trỏ đúng đối tượng mới
             playerVisual = skinObj.GetComponentInChildren<PlayerVisual>(true);
-            if (playerVisual == null)
-            {
-                Debug.LogWarning($"Skin '{skinKey}' không có PlayerVisual trong hierarchy.");
-            }
-
-            Debug.Log($"Spawn thành công skin với Key: {skinKey}");
+            
+            Debug.Log($"[Client/Host] Spawn thành công skin: {skinKey}");
         }
         else
         {
-            Debug.LogError($"Không tìm thấy Addressable nào có Key là: {skinKey}");
-            _lastSkinKey = ""; // Reset key nếu lỗi để có thể thử lại
+            Debug.LogError($"Lỗi load Addressable: {skinKey}");
+            _lastSkinKey = "";
         }
     }
-
 
     private void OnCollisionExit2D(Collision2D collision)
     {
@@ -135,10 +126,15 @@ public class PlayerController : NetworkBehaviour
             touchingBomb = null;
         }
     }
+
+    public void RequestChangeSkin(string newKey)
+    {
+        if (!IsServer) return;
+        _currentSkinKey.Value = newKey;
+    }
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        ChangeSkinByKey("Blue_Def"); 
         // if (playerVisual == null)
         // {
         //     playerVisual = GetComponentInChildren<PlayerVisual>(true);
@@ -147,9 +143,22 @@ public class PlayerController : NetworkBehaviour
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
     }
-
+    private void OnSkinKeyChanged(FixedString64Bytes previousValue, FixedString64Bytes newValue)
+    {
+        ChangeSkinByKey(newValue.ToString());
+    }
     public override void OnNetworkSpawn()
     {
+        _currentSkinKey.OnValueChanged += OnSkinKeyChanged;
+
+            _currentSkinKey.Value = "Red_Def";
+
+        string initialSkinKey = _currentSkinKey.Value.ToString();
+        if (!string.IsNullOrEmpty(initialSkinKey))
+        {
+            ChangeSkinByKey(initialSkinKey);
+        }
+
         Vector2 spawnedPosition = transform.position;
         rb.position = spawnedPosition;
 
@@ -167,6 +176,8 @@ public class PlayerController : NetworkBehaviour
     }
     public override void OnNetworkDespawn()
     {
+        _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
+
         if (_currentSkinHandle.IsValid())
         {
             Addressables.ReleaseInstance(_currentSkinHandle);

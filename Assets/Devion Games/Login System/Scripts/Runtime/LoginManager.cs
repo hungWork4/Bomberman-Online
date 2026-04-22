@@ -16,6 +16,7 @@ namespace DevionGames.LoginSystem
 			private const string PendingUsernameKey = "SupabasePendingUsername";
 			private const string PendingEmailKey = "SupabasePendingEmail";
 			private const string PendingDisplayNameKey = "SupabasePendingDisplayName";
+			private const string SupabaseUserIdKey = "SupabaseUserId";
 
 		/// <summary>
 		/// The LoginManager singleton object. This object is set inside Awake()
@@ -457,7 +458,12 @@ namespace DevionGames.LoginSystem
 						{
 							PlayerPrefs.SetString(LoginManager.Server.accessTokenKey, accessToken);
 							PlayerPrefs.SetString(LoginManager.Server.refreshTokenKey, refreshToken);
+							if (!string.IsNullOrEmpty(userId))
+							{
+								PlayerPrefs.SetString(SupabaseUserIdKey, userId);
+							}
 							PlayerPrefs.Save();
+							SupabaseManager.SetAuthContext(userId, accessToken);
 							yield return UpsertPlayerProfileInternal(userId, username, email, displayName);
 							ClearPendingProfile();
 						}
@@ -555,7 +561,13 @@ namespace DevionGames.LoginSystem
 						PlayerPrefs.SetString(LoginManager.Server.accessTokenKey, accessToken);
 						PlayerPrefs.SetString(LoginManager.Server.refreshTokenKey, refreshToken);
 						PlayerPrefs.SetString(LoginManager.Server.accountKey, loginIdentifier);
+						if (!string.IsNullOrEmpty(userId))
+						{
+							PlayerPrefs.SetString(SupabaseUserIdKey, userId);
+						}
 						PlayerPrefs.Save();
+						SupabaseManager.SetAuthContext(userId, accessToken);
+						_ = SupabaseManager.RefreshPlayerSnapshotAsync();
 
 						string usernameToSave = metadataUsername;
 						if (string.IsNullOrEmpty(usernameToSave) && pendingEmail == loginEmail)
