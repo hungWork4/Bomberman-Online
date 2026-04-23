@@ -8,6 +8,24 @@ using System.Collections.Generic;
 
 public class GeminiChatbox : MonoBehaviour
 {
+    private const string BombermanScopeInstruction =
+        "Bạn là trợ lý AI cho game Bomberman Online. " +
+        "Bạn chỉ được trả lời trong phạm vi luật chơi Bomberman sau: " +
+        "Mỗi người chơi di chuyển 4 hướng bằng WASD, mục tiêu là sống sót cuối cùng. " +
+        "Nhấn Space để đặt bom tại ô hiện tại (tọa độ làm tròn theo lưới). " +
+        "Bom nổ sau khoảng 3 giây, vùng nổ lan hình dấu cộng (lên/xuống/trái/phải). " +
+        "Nếu đứng trong vùng nổ thì nhân vật chết. " +
+        "Phá block mềm có thể rơi item để tăng sức mạnh. " +
+        "Dùng bom để mở đường, lấy item, và hạ đối thủ. " +
+        "Chi tiết: " +
+        "Luật đặt bom: mặc định mỗi người có 1 bom đặt đồng thời; bom nổ xong mới hồi lượt đặt bom; bán kính nổ mặc định 1 và tăng bằng item BlastRadius. " +
+        "Luật nổ: nổ tâm + 4 hướng theo từng ô; gặp vật cản thuộc explosionLayerMask thì dừng; gặp bom khác thì nổ dây chuyền. " +
+        "Luật phá map và rơi item: ô phá hủy được sẽ bị xóa tile; tỉ lệ rơi item mặc định 20%. " +
+        "Luật item: ExtraBomb tăng số bom, BlastRadius tăng bán kính nổ, SpeedIncrease tăng tốc chạy. " +
+        "Luật chết: chạm collider Explosion thì vào death sequence. " +
+        "Luật thắng thua: nhánh classic còn <= 1 người sống thì sau 3 giây load round mới; nhánh netcode mới hiện chưa chốt winner đầy đủ như classic. " +
+        "Nếu câu hỏi nằm ngoài phạm vi này, hãy trả lời ngắn gọn: 'Mình chỉ hỗ trợ chủ đề luật chơi Bomberman ở phòng chat này.'";
+
     [Header("UI References")]
     public TMP_InputField chatInputField;
     public Transform chatContentParent;
@@ -37,7 +55,7 @@ public class GeminiChatbox : MonoBehaviour
     public string apiKey = "YOUR_GEMINI_API_KEY"; 
     
     // Đã đổi sang gemini-1.5-flash-latest để khắc phục lỗi 404 (Model Not Found)
-   private string apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=";
+   private string apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=";
 
     private ChatMessage pendingBotMessage;
 
@@ -256,7 +274,7 @@ public class GeminiChatbox : MonoBehaviour
 
     IEnumerator SendToGemini(string prompt)
     {
-        pendingBotMessage = AddChatMessage("<color=#999999>Gemini đang gõ...</color>", false);
+        pendingBotMessage = AddChatMessage("<color=#999999>ADMIN đang gõ...</color>", false);
 
         string requestUrl = apiUrl + apiKey.Trim();
 
@@ -268,7 +286,7 @@ public class GeminiChatbox : MonoBehaviour
                 {
                     parts = new PartData[]
                     {
-                        new PartData { text = prompt }
+                        new PartData { text = BuildScopedPrompt(prompt) }
                     }
                 }
             }
@@ -295,7 +313,7 @@ public class GeminiChatbox : MonoBehaviour
             {
                 string jsonResponse = request.downloadHandler.text;
                 string replyText = ExtractTextFromJson(jsonResponse);
-                AddChatMessage("<color=#00BFFF>Gemini:</color> " + replyText);
+                AddChatMessage("<color=#00BFFF>ADMIN:</color> " + replyText);
             }
             else
             {
@@ -311,6 +329,11 @@ public class GeminiChatbox : MonoBehaviour
                                "\nChi tiết từ Google: " + errorDetail);
             }
         }
+    }
+
+    private string BuildScopedPrompt(string userPrompt)
+    {
+        return BombermanScopeInstruction + "\n\nNgười chơi hỏi: " + userPrompt;
     }
 
     private string ExtractTextFromJson(string json)

@@ -484,9 +484,37 @@ PrefabInstance:
       propertyPath: m_CellSize.x
       value: 778.35
       objectReference: {fileID: 0}
+    - target: {fileID: 4905146931562426543, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 38bbcfd18ee8b55459594a553cd3bb01, type: 2}
+    - target: {fileID: 4905146931562426543, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: -5265820755251168995, guid: 38bbcfd18ee8b55459594a553cd3bb01, type: 2}
+    - target: {fileID: 4905146931562426543, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5559871527500006497, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
       propertyPath: m_Name
       value: Chat
+      objectReference: {fileID: 0}
+    - target: {fileID: 7348002104152002085, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_text
+      value: 'Enter text... '
+      objectReference: {fileID: 0}
+    - target: {fileID: 7348002104152002085, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 38bbcfd18ee8b55459594a553cd3bb01, type: 2}
+    - target: {fileID: 7348002104152002085, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: -5265820755251168995, guid: 38bbcfd18ee8b55459594a553cd3bb01, type: 2}
+    - target: {fileID: 7348002104152002085, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8274133913362600777, guid: 6e8c3fb552844364fb66b153e5caab23, type: 3}
       propertyPath: m_SizeDelta.x
@@ -721,7 +749,7 @@ MonoBehaviour:
   chatScrollRect: {fileID: 1926652614}
   autoScrollThreshold: 0.2
   maxCharactersPerMessagePrefab: 100
-  apiKey: AIzaSyAl0BXD2-EgkayZfi2HUV4hq-tRYkxr7WI
+  apiKey: AIzaSyDUOzv9hGDig6q65Qc0oONB9nyj_O3CWjo
 --- !u!4 &1875757064
 Transform:
   m_ObjectHideFlags: 0
