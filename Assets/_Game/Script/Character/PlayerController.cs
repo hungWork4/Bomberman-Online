@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.AddressableAssets;
 using Unity.Collections;
+using System.Threading.Tasks;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : NetworkBehaviour
@@ -21,7 +22,6 @@ public class PlayerController : NetworkBehaviour
     private Vector2 currentInput;
     private Vector2 lastSentInput;// client
     private Vector2 hostLastInput;
-
     [Header("Input")]
     public KeyCode inputUp = KeyCode.W;
     public KeyCode inputDown = KeyCode.S;
@@ -98,7 +98,9 @@ public class PlayerController : NetworkBehaviour
 
         if (IsServer)
         {
-            _currentSkinKey.Value = "Red_Def";
+            long currentSkinId = SupabaseManager.CurrentPlayerSnapshot.CurrentSkinId;
+            // _currentSkinKey.Value = SupabaseManager.GetSkinKeyById(currentSkinId);
+            _ = InitializeSkinFromSupabaseAsync(currentSkinId);
         }
 
         string initialSkinKey = _currentSkinKey.Value.ToString();
@@ -122,6 +124,17 @@ public class PlayerController : NetworkBehaviour
         }
 
         lastProcessedState = serverState.Value;
+    }
+
+    private async Task InitializeSkinFromSupabaseAsync(long currentSkinId)
+    {
+        string skinKey = await SupabaseManager.GetSkinKeyByIdAsync(currentSkinId);
+        if (!IsServer || !IsSpawned)
+        {
+            return;
+        }
+
+        _currentSkinKey.Value = skinKey;
     }
 
     public override void OnNetworkDespawn()

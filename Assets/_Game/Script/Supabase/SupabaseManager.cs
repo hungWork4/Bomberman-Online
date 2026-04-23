@@ -24,6 +24,8 @@ public class SupabaseManager : MonoBehaviour
     public static bool HasPlayerSnapshot { get; private set; }
     public static PlayerSnapshot CurrentPlayerSnapshot { get; private set; }
 
+    private static readonly Dictionary<long, string> skinKeyCache = new Dictionary<long, string>();
+
     [SerializeField] private string supabaseUrl;
     [SerializeField] private string supabaseAnonKey;
 
@@ -135,6 +137,77 @@ public class SupabaseManager : MonoBehaviour
         CurrentPlayerSnapshot = snapshot;
         HasPlayerSnapshot = true;
         return snapshot;
+    }
+
+    public static string GetSkinKeyById(long skinId)
+    {
+        if (skinKeyCache.TryGetValue(skinId, out string cachedSkinKey) && !string.IsNullOrEmpty(cachedSkinKey))
+        {
+            return cachedSkinKey;
+        }
+
+        return "White_Def";
+    }
+
+    public static async Task<string> GetSkinKeyByIdAsync(long skinId)
+    {
+        string cachedSkinKey = GetSkinKeyById(skinId);
+        if (!string.Equals(cachedSkinKey, "White_Def"))
+        {
+            return cachedSkinKey;
+        }
+
+        if (skinId <= 0)
+        {
+            return "White_Def";
+        }
+
+        await EnsureInitializedAsync();
+
+        if (!TryGetAccessToken(out string accessToken))
+        {
+            Debug.LogWarning("[SupabaseManager] Chưa có access token để lấy skin key.");
+            return "White_Def";
+        }
+
+        if (string.IsNullOrEmpty(ProjectUrl) || string.IsNullOrEmpty(AnonKey))
+        {
+            Debug.LogWarning("[SupabaseManager] Thiếu ProjectUrl/AnonKey để lấy skin key.");
+            return "White_Def";
+        }
+
+        string baseUrl = ProjectUrl.TrimEnd('/');
+        string skinUrl = baseUrl + "/rest/v1/skins?select=asset_key&id=eq." + skinId + "&limit=1";
+
+        using (UnityWebRequest skinRequest = UnityWebRequest.Get(skinUrl))
+        {
+            SetupAuthHeaders(skinRequest, accessToken);
+            var operation = skinRequest.SendWebRequest();
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            if (skinRequest.isNetworkError || skinRequest.isHttpError)
+            {
+                Debug.LogWarning("[SupabaseManager] Không lấy được skin key: " + skinRequest.error + " " + skinRequest.downloadHandler.text);
+                return "White_Def";
+            }
+
+            Match keyMatch = Regex.Match(skinRequest.downloadHandler.text, "\"asset_key\"\\s*:\\s*\"([^\"]+)\"");
+            if (keyMatch.Success && keyMatch.Groups.Count > 1)
+            {
+                string skinKey = keyMatch.Groups[1].Value;
+                if (!string.IsNullOrEmpty(skinKey))
+                {
+                    skinKeyCache[skinId] = skinKey;
+                    return skinKey;
+                }
+            }
+        }
+
+        return "White_Def";
     }
 
     private static void SetupAuthHeaders(UnityWebRequest request, string accessToken)
@@ -307,5 +380,6 @@ public class SupabaseManager : MonoBehaviour
         CurrentAccessToken = null;
         HasPlayerSnapshot = false;
         CurrentPlayerSnapshot = default;
+        skinKeyCache.Clear();
     }
 }
