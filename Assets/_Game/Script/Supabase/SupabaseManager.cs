@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Text;
 using System.Threading.Tasks;
 using Supabase;
 using UnityEngine;
@@ -25,6 +26,7 @@ public class SupabaseManager : MonoBehaviour
     public static PlayerSnapshot CurrentPlayerSnapshot { get; private set; }
 
     private static readonly Dictionary<long, string> skinKeyCache = new Dictionary<long, string>();
+    private static readonly Dictionary<string, PlayerSnapshot> playerSnapshotsByUserId = new Dictionary<string, PlayerSnapshot>();
 
     [SerializeField] private string supabaseUrl;
     [SerializeField] private string supabaseAnonKey;
@@ -40,7 +42,28 @@ public class SupabaseManager : MonoBehaviour
     public static bool TryGetCachedPlayerSnapshot(out PlayerSnapshot snapshot)
     {
         snapshot = CurrentPlayerSnapshot;
+
+        if (TryGetCurrentUserId(out string userId))
+        {
+            if (TryGetCachedPlayerSnapshot(userId, out PlayerSnapshot userSnapshot))
+            {
+                snapshot = userSnapshot;
+                return true;
+            }
+        }
+
         return HasPlayerSnapshot;
+    }
+
+    public static bool TryGetCachedPlayerSnapshot(string userId, out PlayerSnapshot snapshot)
+    {
+        snapshot = default;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return false;
+        }
+
+        return playerSnapshotsByUserId.TryGetValue(userId, out snapshot);
     }
 
     public static async Task<PlayerSnapshot?> RefreshPlayerSnapshotAsync()
@@ -70,7 +93,7 @@ public class SupabaseManager : MonoBehaviour
             UserId = playerId,
             DisplayName = string.Empty,
             Gold = 0,
-            CurrentSkinId = 0,
+            CurrentSkinId = HasPlayerSnapshot ? CurrentPlayerSnapshot.CurrentSkinId : 0,
             OwnedSkinIds = new HashSet<long>()
         };
 
@@ -119,6 +142,11 @@ public class SupabaseManager : MonoBehaviour
                 {
                     snapshot.CurrentSkinId = s;
                 }
+                else if (HasPlayerSnapshot)
+                {
+                    // Keep cached value when stats response doesn't include current_skin_id (RLS/projection issues).
+                    snapshot.CurrentSkinId = CurrentPlayerSnapshot.CurrentSkinId;
+                }
             }
 
             if (!inventoryRequest.isNetworkError && !inventoryRequest.isHttpError)
@@ -136,7 +164,116 @@ public class SupabaseManager : MonoBehaviour
 
         CurrentPlayerSnapshot = snapshot;
         HasPlayerSnapshot = true;
+        playerSnapshotsByUserId[playerId] = snapshot;
         return snapshot;
+    }
+
+    public static async Task<bool> UpdateCurrentSkinIdAsync(long skinId)
+    {
+        if (skinId < 0)
+        {
+            Debug.LogWarning("[SupabaseManager] skinId không hợp lệ để cập nhật current_skin_id.");
+            return false;
+        }
+
+        await EnsureInitializedAsync();
+
+        if (!TryGetCurrentUserId(out string playerId))
+        {
+            Debug.LogWarning("[SupabaseManager] Không có userId để cập nhật current_skin_id.");
+            return false;
+        }
+
+        if (!TryGetAccessToken(out string accessToken))
+        {
+            Debug.LogWarning("[SupabaseManager] Không có access token để cập nhật current_skin_id.");
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(ProjectUrl) || string.IsNullOrEmpty(AnonKey))
+        {
+            Debug.LogWarning("[SupabaseManager] Thiếu ProjectUrl/AnonKey để cập nhật current_skin_id.");
+            return false;
+        }
+
+        string encodedPlayerId = UnityWebRequest.EscapeURL(playerId);
+        string endpoint = ProjectUrl.TrimEnd('/') + "/rest/v1/player_stats?id=eq." + encodedPlayerId;
+        string payload = "{\"current_skin_id\":" + skinId + "}";
+        bool isRowUpdated = false;
+        string responseText = string.Empty;
+        long responseCode = 0;
+
+        Debug.Log("[SupabaseManager] Update current_skin_id. playerId=" + playerId + ", skinId=" + skinId);
+
+        using (UnityWebRequest request = new UnityWebRequest(endpoint, "PATCH"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("apikey", AnonKey);
+            request.SetRequestHeader("Authorization", "Bearer " + accessToken);
+            request.SetRequestHeader("Prefer", "return=representation,count=exact");
+
+            var operation = request.SendWebRequest();
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            if (request.isNetworkError || request.isHttpError)
+            {
+                Debug.LogWarning("[SupabaseManager] Cập nhật current_skin_id thất bại: " + request.error + " " + request.downloadHandler.text);
+                return false;
+            }
+
+            responseCode = request.responseCode;
+            responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
+            Match skinIdMatch = Regex.Match(responseText, "\"current_skin_id\"\\s*:\\s*(\\d+)");
+            if (skinIdMatch.Success && skinIdMatch.Groups.Count > 1 && long.TryParse(skinIdMatch.Groups[1].Value, out long updatedSkinId))
+            {
+                isRowUpdated = updatedSkinId == skinId;
+            }
+        }
+
+        if (!isRowUpdated)
+        {
+            Debug.LogWarning("[SupabaseManager] PATCH không trả row current_skin_id (code=" + responseCode + "). Có thể do RLS chặn SELECT response. Body=" + responseText);
+        }
+
+        SetCachedCurrentSkinId(playerId, skinId);
+
+        // Verify authoritative value from DB snapshot when possible.
+        var refreshed = await RefreshPlayerSnapshotAsync();
+        if (refreshed.HasValue && refreshed.Value.CurrentSkinId != skinId)
+        {
+            Debug.LogWarning("[SupabaseManager] Verify sau update bị lệch. playerId=" + playerId + ", expected=" + skinId + ", actual=" + refreshed.Value.CurrentSkinId);
+            return false;
+        }
+
+        return true;
+    }
+
+    public static void SetCachedCurrentSkinId(string userId, long skinId)
+    {
+        PlayerSnapshot snapshot;
+        if (!TryGetCachedPlayerSnapshot(userId, out snapshot))
+        {
+            snapshot = CurrentPlayerSnapshot;
+        }
+
+        snapshot.UserId = string.IsNullOrEmpty(snapshot.UserId) ? userId : snapshot.UserId;
+        snapshot.CurrentSkinId = skinId;
+
+        if (snapshot.OwnedSkinIds == null)
+        {
+            snapshot.OwnedSkinIds = new HashSet<long>();
+        }
+
+        snapshot.OwnedSkinIds.Add(skinId);
+
+        playerSnapshotsByUserId[userId] = snapshot;
+        CurrentPlayerSnapshot = snapshot;
+        HasPlayerSnapshot = true;
     }
 
     public static string GetSkinKeyById(long skinId)
@@ -253,12 +390,6 @@ public class SupabaseManager : MonoBehaviour
     {
         userId = null;
 
-        if (!string.IsNullOrEmpty(CurrentUserId))
-        {
-            userId = CurrentUserId;
-            return true;
-        }
-
         if (Client != null)
         {
             object auth = GetPropertyValue(Client, "Auth");
@@ -290,6 +421,12 @@ public class SupabaseManager : MonoBehaviour
                         }
                     }
                 }
+            }
+
+            if (!string.IsNullOrEmpty(CurrentUserId))
+            {
+                userId = CurrentUserId;
+                return true;
             }
         }
 
@@ -325,12 +462,6 @@ public class SupabaseManager : MonoBehaviour
     {
         accessToken = null;
 
-        if (!string.IsNullOrEmpty(CurrentAccessToken))
-        {
-            accessToken = CurrentAccessToken;
-            return true;
-        }
-
         if (Client != null)
         {
             object auth = GetPropertyValue(Client, "Auth");
@@ -347,6 +478,12 @@ public class SupabaseManager : MonoBehaviour
                     }
                 }
             }
+        }
+
+        if (!string.IsNullOrEmpty(CurrentAccessToken))
+        {
+            accessToken = CurrentAccessToken;
+            return true;
         }
 
         // Fallback for the login system that stores auth data in PlayerPrefs.
@@ -381,5 +518,6 @@ public class SupabaseManager : MonoBehaviour
         HasPlayerSnapshot = false;
         CurrentPlayerSnapshot = default;
         skinKeyCache.Clear();
+        playerSnapshotsByUserId.Clear();
     }
 }

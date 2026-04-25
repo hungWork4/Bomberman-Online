@@ -96,11 +96,9 @@ public class PlayerController : NetworkBehaviour
     {
         _currentSkinKey.OnValueChanged += OnSkinKeyChanged;
 
-        if (IsServer)
+        if (IsOwner)
         {
-            long currentSkinId = SupabaseManager.CurrentPlayerSnapshot.CurrentSkinId;
-            // _currentSkinKey.Value = SupabaseManager.GetSkinKeyById(currentSkinId);
-            _ = InitializeSkinFromSupabaseAsync(currentSkinId);
+            _ = SubmitInitialSkinForOwnerAsync();
         }
 
         string initialSkinKey = _currentSkinKey.Value.ToString();
@@ -124,6 +122,47 @@ public class PlayerController : NetworkBehaviour
         }
 
         lastProcessedState = serverState.Value;
+    }
+
+    private async Task SubmitInitialSkinForOwnerAsync()
+    {
+        long currentSkinId = 0;
+
+        if (SupabaseManager.TryGetCachedPlayerSnapshot(out SupabaseManager.PlayerSnapshot snapshot))
+        {
+            currentSkinId = snapshot.CurrentSkinId;
+        }
+        else
+        {
+            var refreshedSnapshot = await SupabaseManager.RefreshPlayerSnapshotAsync();
+            if (refreshedSnapshot.HasValue)
+            {
+                currentSkinId = refreshedSnapshot.Value.CurrentSkinId;
+            }
+        }
+
+        SubmitCurrentSkinServerRpc(currentSkinId);
+    }
+
+    [ServerRpc]
+    private void SubmitCurrentSkinServerRpc(long skinId)
+    {
+        _ = SubmitCurrentSkinServerAsync(skinId);
+    }
+
+    private async Task SubmitCurrentSkinServerAsync(long skinId)
+    {
+        if (!IsServer || !IsSpawned)
+        {
+            return;
+        }
+
+        if (skinId < 0)
+        {
+            skinId = 0;
+        }
+
+        await InitializeSkinFromSupabaseAsync(skinId);
     }
 
     private async Task InitializeSkinFromSupabaseAsync(long currentSkinId)

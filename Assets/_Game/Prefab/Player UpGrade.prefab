@@ -72,7 +72,6 @@ MonoBehaviour:
   _movespeed:
     m_InternalValue: 5
   remotePositionLerp: 16
-  playerVisual: {fileID: 0}
   inputUp: 119
   inputDown: 115
   inputLeft: 97
@@ -94,7 +93,7 @@ MonoBehaviour:
   bombFuseTime: 3
   bombAmount: 2
   explosionRadius:
-    m_InternalValue: 2
+    m_InternalValue: 1
   destructibleTiles: {fileID: 0}
 --- !u!58 &4786881655137900285
 CircleCollider2D:

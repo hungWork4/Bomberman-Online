@@ -184,7 +184,8 @@ public class GameLobby : MonoBehaviour
             if (!string.IsNullOrEmpty(player?.Id))
             {
                 string ready = TryGetPlayerDataValue(player, "is_ready");
-                playerStates.Add(player.Id + ":" + ready);
+                string skinId = TryGetPlayerDataValue(player, "skin_id");
+                playerStates.Add(player.Id + ":" + ready + ":" + skinId);
             }
         }
 
@@ -358,6 +359,51 @@ public class GameLobby : MonoBehaviour
         catch (LobbyServiceException e)
         {
             Debug.LogWarning("SetLocalPlayerReady failed: " + e.Message);
+        }
+    }
+
+    public async Task<bool> SetLocalPlayerSkinAsync(int skinId)
+    {
+        if (joinedLobby == null)
+        {
+            return false;
+        }
+
+        string localPlayerId = AuthenticationService.Instance.PlayerId;
+        try
+        {
+            UpdatePlayerOptions updatePlayerOptions = new UpdatePlayerOptions
+            {
+                Data = new Dictionary<string, PlayerDataObject>
+                {
+                    { "skin_id", new PlayerDataObject(PlayerDataObject.VisibilityOptions.Member, skinId.ToString(CultureInfo.InvariantCulture)) }
+                }
+            };
+
+            await LobbyService.Instance.UpdatePlayerAsync(joinedLobby.Id, localPlayerId, updatePlayerOptions);
+
+            foreach (Player player in joinedLobby.Players)
+            {
+                if (player != null && player.Id == localPlayerId)
+                {
+                    if (player.Data == null)
+                    {
+                        player.Data = new Dictionary<string, PlayerDataObject>();
+                    }
+
+                    player.Data["skin_id"] = new PlayerDataObject(PlayerDataObject.VisibilityOptions.Member, skinId.ToString(CultureInfo.InvariantCulture));
+                    break;
+                }
+            }
+
+            lastPlayerSetSignature = BuildPlayerSetSignature(joinedLobby);
+            OnLobbyPlayersChanged?.Invoke();
+            return true;
+        }
+        catch (LobbyServiceException e)
+        {
+            Debug.LogWarning("SetLocalPlayerSkinAsync failed: " + e.Message);
+            return false;
         }
     }
 
