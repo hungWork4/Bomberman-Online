@@ -21,7 +21,7 @@ public class BombermanAI : NetworkBehaviour
     public LayerMask bombLayer;
     [Tooltip("Gán layer chứa vùng nổ (Explosion) vào đây")]
     public LayerMask explosionLayer;
-
+    [SerializeField] private Animator animator;
     [Header("Bomb Settings")]
     [SerializeField] private GameObject bombPrefab;
     [SerializeField] private float bombFuseTime = 3f;
@@ -55,6 +55,15 @@ public class BombermanAI : NetworkBehaviour
     private float ownBombExplodeTime;
     private string lastBehaviorLogged;
     private Tilemap destructibleTiles;
+    private Vector2 lastMoveDirection = new Vector2(0f, -1f);
+    private Vector2 lastAnimationSamplePosition;
+    private bool hasAnimationSample;
+    private readonly int animMoveX = Animator.StringToHash("MoveX");
+    private readonly int animMoveY = Animator.StringToHash("MoveY");
+    private readonly int animSpeed = Animator.StringToHash("Speed");
+    private readonly int animLastMoveX = Animator.StringToHash("LastMoveX");
+    private readonly int animLastMoveY = Animator.StringToHash("LastMoveY");
+    private readonly int animIsDead = Animator.StringToHash("IsDead");
     private readonly Vector2Int[] cardinalDirs =
     {
         Vector2Int.up,
@@ -71,6 +80,11 @@ public class BombermanAI : NetworkBehaviour
         rb = GetComponent<Rigidbody2D>();
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
+        // animator.gameObject.transform.position += new Vector3(0f, 0.309f, -0.1f); // Đảm bảo animator render phía trước
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
     }
 
     private void OnEnable()
@@ -102,6 +116,8 @@ public class BombermanAI : NetworkBehaviour
     {
         // Căn chỉnh vị trí AI khớp với tâm lưới (Grid) khi vừa xuất hiện
         rb.position = new Vector2(Mathf.Round(transform.position.x), Mathf.Round(transform.position.y));
+        lastAnimationSamplePosition = rb.position;
+        hasAnimationSample = true;
 
         if (IsServer)
         {
@@ -164,6 +180,8 @@ public class BombermanAI : NetworkBehaviour
     {
         if (!IsSpawned || isDead) return;
 
+        SampleAndApplyMovementAnimation();
+
         if (IsServer)
         {
             if (Time.time < startRunTime)
@@ -185,6 +203,43 @@ public class BombermanAI : NetworkBehaviour
             // Nội suy vị trí cho máy Client để chống giật
             rb.position = Vector2.Lerp(rb.position, serverPosition.Value, remotePositionLerp * Time.fixedDeltaTime);
         }
+    }
+
+    private void SampleAndApplyMovementAnimation()
+    {
+        if (!hasAnimationSample)
+        {
+            lastAnimationSamplePosition = rb.position;
+            hasAnimationSample = true;
+            SetMovementAnimation(Vector2.zero);
+            return;
+        }
+
+        Vector2 currentPos = rb.position;
+        Vector2 delta = currentPos - lastAnimationSamplePosition;
+        lastAnimationSamplePosition = currentPos;
+
+        Vector2 direction = delta.sqrMagnitude > 0.00000025f ? delta.normalized : Vector2.zero;
+        SetMovementAnimation(direction);
+    }
+
+    private void SetMovementAnimation(Vector2 direction)
+    {
+        if (animator == null)
+        {
+            return;
+        }
+
+        if (direction.sqrMagnitude > 0.0001f)
+        {
+            lastMoveDirection = direction;
+        }
+
+        animator.SetFloat(animMoveX, direction.x);
+        animator.SetFloat(animMoveY, direction.y);
+        animator.SetFloat(animSpeed, direction.sqrMagnitude);
+        animator.SetFloat(animLastMoveX, lastMoveDirection.x);
+        animator.SetFloat(animLastMoveY, lastMoveDirection.y);
     }
 
     // ==========================================
@@ -1063,11 +1118,12 @@ public class BombermanAI : NetworkBehaviour
     [ClientRpc]
     private void DeathSequenceClientRpc()
     {
-        //isDead = true;
-        //enabled = false;
-
-        //var col = GetComponent<Collider2D>();
-        //if (col != null) col.enabled = false;
+        isDead = true;
+        SetMovementAnimation(Vector2.zero);
+        if (animator != null)
+        {
+            animator.SetBool(animIsDead, true);
+        }
 
         Debug.Log("AI bị hạ gục bởi sức ép từ vụ nổ!");
     }
