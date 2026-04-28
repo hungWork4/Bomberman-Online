@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Tilemaps;
-using Pathfinding.BehaviourTrees; 
+using Pathfinding.BehaviourTrees;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class BombermanAI : NetworkBehaviour
@@ -33,6 +33,8 @@ public class BombermanAI : NetworkBehaviour
     [SerializeField] private float maxAttackTravelDistance = 2.5f;
     [SerializeField] private float attackCooldown = 2.5f;
     private float nextAttackAllowedTime;
+    private string lockedBehavior = "";
+    private float lockBehaviorUntil = 0f;
 
     [SerializeField] private NetworkVariable<int> explosionRadius = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public int ExplosionRadius { get => explosionRadius.Value; set => explosionRadius.Value = value; }
@@ -127,7 +129,17 @@ public class BombermanAI : NetworkBehaviour
             InitBehaviorTree();
         }
     }
-
+    public void LockBehavior(string behaviorName, float duration)
+    {
+        lockedBehavior = behaviorName;
+        lockBehaviorUntil = Time.time + duration;
+    }
+    public bool IsBehaviorLocked(string behaviorName)
+    {
+        return lockedBehavior == behaviorName &&
+            Time.time < lockBehaviorUntil;
+    }
+    
     private void InitBehaviorTree()
     {
         tree = new BehaviourTree("Smart Bomberman AI");
@@ -140,7 +152,11 @@ public class BombermanAI : NetworkBehaviour
 
         // Nhánh 1 (Ưu tiên 100): Né Bomb - Quét vùng nổ chữ thập và tìm góc khuất
         Sequence dodgeSequence = new Sequence("Dodge Bomb", 100);
-        dodgeSequence.AddChild(new Leaf("Check Danger", new Condition(ShouldDodgeNow)));
+        // dodgeSequence.AddChild(new Leaf("Check Danger", new Condition(ShouldDodgeNow)));
+        dodgeSequence.AddChild(new Leaf("Check Danger", new Condition(() =>
+        {
+            return ShouldDodgeNow() && !CanSafelyAttackNow();
+        })));
         dodgeSequence.AddChild(new Leaf("Move To Safe Spot", dodgeStrategy));
 
         // Nhánh 2 (Ưu tiên 70): Tấn công người chơi - chọn điểm đặt bomb giảm đường thoát của đối thủ
@@ -190,7 +206,7 @@ public class BombermanAI : NetworkBehaviour
                 return;
             }
 
-            if (ShouldDodgeNow())
+            if (ShouldDodgeNow() && !CanSafelyAttackNow())
             {
                 ResetNonDodgeStrategies();
             }
@@ -662,19 +678,18 @@ public class BombermanAI : NetworkBehaviour
 
     private bool ShouldAttackPlayerNow()
     {
+        // Nếu đang khóa Attack -> luôn tiếp tục attack
+        if (IsBehaviorLocked("Attack"))
+            return true;
+
         if (Time.time < nextAttackAllowedTime)
-        {
             return false;
-        }
 
         if (!CanPlantBombNow())
-        {
             return false;
-        }
 
         return HasPlayerInAttackRange();
     }
-
     private bool HasPlayerInAttackRange()
     {
         GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
@@ -952,12 +967,12 @@ public class BombermanAI : NetworkBehaviour
 
     public void NotifyAttackExecuted()
     {
-        if (!IsServer)
-        {
-            return;
-        }
+        if (!IsServer) return;
 
         nextAttackAllowedTime = Time.time + Mathf.Max(0f, attackCooldown);
+
+        lockedBehavior = "";
+        lockBehaviorUntil = 0f;
     }
 
     public void AddBomb()
@@ -1026,7 +1041,39 @@ public class BombermanAI : NetworkBehaviour
             moveToItemPickupStrategy?.Reset();
         }
     }
+    private bool CanSafelyAttackNow()
+    {
+        if (!CanPlantBombNow())
+            return false;
 
+        if (!TryGetBestPlayerAttackCell(out _, out Vector2 attackCell, out _))
+            return false;
+
+        // đứng ngay ô attack rồi thì check escape
+        if (Vector2.Distance(rb.position, attackCell) < 0.1f)
+        {
+            return CanEscapeAfterBomb(attackCell);
+        }
+
+        return true;
+    }
+    private bool CanEscapeAfterBomb(Vector2 bombPos)
+    {
+        foreach (Vector2Int dir in cardinalDirs)
+        {
+            Vector2 next = bombPos + (Vector2)dir;
+
+            if (!IsCellWalkable(next))
+                continue;
+
+            if (IsInsideBombBlast(next, bombPos, ExplosionRadius))
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
     private void IdleAction()
     {
         if (CanPlantBombNearDestructible())
@@ -1124,7 +1171,10 @@ public class BombermanAI : NetworkBehaviour
         {
             animator.SetBool(animIsDead, true);
         }
-
+        DG.Tweening.DOVirtual.DelayedCall(1.5f, () =>
+        {
+            gameObject.SetActive(false);
+        });
         Debug.Log("AI bị hạ gục bởi sức ép từ vụ nổ!");
     }
 }
@@ -1339,7 +1389,7 @@ public class AIAttackPlayer : IStrategy
         playerCell = foundPlayerCell;
         attackCell = foundAttackCell;
         cachedEscapeRoutes = escapeRoutes;
-
+        ai.LockBehavior("Attack", 1.0f);
         Vector2 currentPos = rb.position;
         float moveStep = ai.moveSpeed * Time.fixedDeltaTime;
 
