@@ -83,4 +83,9 @@ public class PlayerVisual : MonoBehaviour
             spriteRenderer.sortingOrder = sortingOrder;
         }
     }
+
+    public Sprite GetCurrentSprite()
+    {
+        return spriteRenderer != null ? spriteRenderer.sprite : null;
+    }
 }

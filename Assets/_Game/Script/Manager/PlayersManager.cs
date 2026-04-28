@@ -86,6 +86,10 @@ public class PlayersManager : NetworkBehaviour
         if (sceneEvent.SceneEventType == SceneEventType.LoadEventCompleted && sceneEvent.SceneName == "Bomberman")
         {
             StartCoroutine(PlaceAllPlayersAtSpawnPointsWhenReady());
+            if(NetworkManagerUI.Instance != null)
+            {
+                StartCoroutine(NetworkManagerUI.Instance.botinit());
+            }
         }
     }
 
@@ -177,6 +181,8 @@ public class PlayersManager : NetworkBehaviour
             }
         }
     }
+
+
     private int GetOrCreateSpawnIndex(ulong clientId)
     {
         if (clientSpawnIndices.TryGetValue(clientId, out int existingIndex))

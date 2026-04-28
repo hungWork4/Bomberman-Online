@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using DG.Tweening;
 using TMPro;
+using Unity.Netcode;
 using Unity.Services.Authentication;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,12 +11,17 @@ using UnityEngine.UI;
 public class LobbyUI : MonoBehaviour
 {
     public static LobbyUI Instance { get; private set; }
+    [SerializeField]private SelectSkinUI selectSkinUI;
+    public GameObject LobbyContainer;
+    [SerializeField] public SkinUI playerUIPrefab;
+    public GameObject AiUIPrefab;
 
-    [SerializeField] private GameObject LobbyContainer;
-    [SerializeField] private SkinUI playerUIPrefab;
     [SerializeField] private Text LobbyInfoText;
     [SerializeField] private Button QuitLobbyButton;
     [SerializeField] private Button ReadyButton;
+    [SerializeField] private Button SkinButton;
+    public Button AddBotButton;
+
     private readonly Dictionary<string, SkinUI> playerUIMap = new Dictionary<string, SkinUI>();
     private readonly Dictionary<string, GameLobby.LobbyPlayerInfo> playerInfoMap = new Dictionary<string, GameLobby.LobbyPlayerInfo>();
 
@@ -37,6 +44,32 @@ public class LobbyUI : MonoBehaviour
         {
             ReadyButton.onClick.AddListener(OnReadyClicked);
         }
+
+        if (SkinButton != null)
+        {
+            SkinButton.onClick.AddListener(() =>
+            {
+                if (selectSkinUI != null)
+                {
+                    selectSkinUI.gameObject.SetActive(true);
+                    selectSkinUI.GetComponent<CanvasGroup>().DOFade(1,1f);
+                }
+            });
+        }
+        if (AddBotButton != null )
+        {
+            AddBotButton.onClick.AddListener(() =>
+            {
+                _ = GameLobby.Instance.AddBot();
+            });
+        }
+        // else
+        // {
+        //     if (AddBotButton != null)
+        //     {
+        //         AddBotButton.gameObject.SetActive(false);
+        //     }
+        // }
     }
 
     private void OnEnable()
@@ -75,7 +108,28 @@ public class LobbyUI : MonoBehaviour
 
     private async void Start()
     {
+
         await PopulateLobbyPlayersAsync();
+        if (GameLobby.Instance != null)
+        {
+            if (!GameLobby.Instance.IsLobbyHost())
+            {
+                if (AddBotButton != null)
+                {
+                    AddBotButton.gameObject.SetActive(false);
+                }
+            }else
+            {
+                if (AddBotButton != null)
+                {
+                    AddBotButton.gameObject.SetActive(true);
+                }
+            }
+        }
+        else
+        {
+            Debug.LogError("GameLobby.Instance is null in LobbyUI.Start");
+        }
     }
 
     private async void HandleLobbyPlayersChanged()

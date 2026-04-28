@@ -15,6 +15,7 @@ public class SelectSkinUI : MonoBehaviour
     [SerializeField] private Button selectButton; // Button để mở UI chọn skin
     [SerializeField] private Color selectedStatusColor = new Color(1f, 0.85f, 0.3f, 1f);
     [SerializeField] private float closeFadeDuration = 0.2f;
+    [SerializeField] private Button QuitButton;
 
     private bool isEquipping;
     private CanvasGroup canvasGroup;
@@ -34,17 +35,23 @@ public class SelectSkinUI : MonoBehaviour
                 _ = HandleSelectButtonClickedAsync();
             });
         }
+        if (QuitButton != null)
+        {
+            QuitButton.onClick.AddListener(() =>
+            {
+                _ = FadeOutAndCloseAsync();
+            });
+        }
     }
 
     private async void OnEnable()
     {
-        if (canvasGroup != null)
-        {
-            canvasGroup.alpha = 1f;
-            canvasGroup.interactable = true;
-            canvasGroup.blocksRaycasts = true;
-        }
-
+        // if (canvasGroup != null)
+        // {
+        //     canvasGroup.alpha = 1f;
+        //     canvasGroup.interactable = true;
+        //     canvasGroup.blocksRaycasts = true;
+        // }
         pendingSelectedSkinId = null;
         await LoadOwnedSkinsAsync();
     }
@@ -243,8 +250,8 @@ public class SelectSkinUI : MonoBehaviour
             return;
         }
 
-        canvasGroup.interactable = false;
-        canvasGroup.blocksRaycasts = false;
+        // canvasGroup.interactable = false;
+        // canvasGroup.blocksRaycasts = false;
 
         float duration = Mathf.Max(0.01f, closeFadeDuration);
         float elapsed = 0f;

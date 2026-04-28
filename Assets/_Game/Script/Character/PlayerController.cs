@@ -5,6 +5,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.AddressableAssets;
 using Unity.Collections;
 using System.Threading.Tasks;
+using UnityEngine.SocialPlatforms.Impl;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : NetworkBehaviour
@@ -12,7 +13,9 @@ public class PlayerController : NetworkBehaviour
     [Header("Movement Settings")]
     [SerializeField] private NetworkVariable<float> _movespeed = new NetworkVariable<float>(5f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public float moveSpeed { get => _movespeed.Value; set => _movespeed.Value = value; }
-    
+    [SerializeField] private NetworkVariable<int> _life = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public int Life { get => _life.Value; set => _life.Value = value; }
+
     [Header("Remote Sync")]
     [SerializeField] private float remotePositionLerp = 15f;
 
@@ -80,6 +83,16 @@ public class PlayerController : NetworkBehaviour
         NetworkVariableReadPermission.Everyone, 
         NetworkVariableWritePermission.Server
     );
+        public NetworkVariable<long> _currentSkinID = new NetworkVariable<long>(
+        -1, 
+        NetworkVariableReadPermission.Everyone, 
+        NetworkVariableWritePermission.Server
+    );
+            public NetworkVariable<FixedString32Bytes> _CurrentPlayerName = new NetworkVariable<FixedString32Bytes>(
+        "", 
+        NetworkVariableReadPermission.Everyone, 
+        NetworkVariableWritePermission.Owner
+    );
     private AsyncOperationHandle<GameObject> _currentSkinHandle;
     private string _lastSkinKey = "";
 
@@ -94,19 +107,30 @@ public class PlayerController : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        if (IsOwner)
+        {
+            _CurrentPlayerName.Value = getPlayerName();
+        }
         _currentSkinKey.OnValueChanged += OnSkinKeyChanged;
-
+        _currentSkinID.OnValueChanged += OnSkinIDChanged;
         if (IsOwner)
         {
             _ = SubmitInitialSkinForOwnerAsync();
         }
-
         string initialSkinKey = _currentSkinKey.Value.ToString();
         if (!string.IsNullOrEmpty(initialSkinKey))
         {
             ChangeSkinByKey(initialSkinKey);
         }
-
+        // ScoreBoardController.Instance?.SpawnPlayerCard(this);
+        // ScoreBoardController.Instance?.UpdatePlayerCard(this);
+        if (_currentSkinID.Value != -1)
+        {
+            InitializeScoreboard();
+        }
+        _life.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
+        _movespeed.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
+        _CurrentPlayerName.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
         Vector2 spawnedPosition = transform.position;
         rb.position = spawnedPosition;
 
@@ -120,10 +144,37 @@ public class PlayerController : NetworkBehaviour
             };
             _lastServerPosition = spawnedPosition;
         }
-
         lastProcessedState = serverState.Value;
+        if(IsOwner)
+        Debug.Log("ten nguoi choi: " + SupabaseManager.CurrentPlayerSnapshot.DisplayName);
+    }
+    private void OnSkinIDChanged(long oldValue, long newValue)
+    {
+        if (newValue != -1)
+        {
+            InitializeScoreboard();
+        }
     }
 
+    private void InitializeScoreboard()
+    {
+        // Đảm bảo ScoreBoard đã sẵn sàng
+        if (ScoreBoardController.Instance != null)
+        {
+            ScoreBoardController.Instance.SpawnPlayerCard(this);
+            ScoreBoardController.Instance.UpdatePlayerCard(this);
+        }
+    }
+    // private void OnSkinIDChanged(long oldValue, long newValue)
+    // {
+    //     // Mỗi khi ID thay đổi, đảm bảo Card đã tồn tại và cập nhật
+    //     ScoreBoardController.Instance?.SpawnPlayerCard(this);
+    //     ScoreBoardController.Instance?.UpdatePlayerCard(this);
+    // }
+    public string getPlayerName()
+    {
+        return SupabaseManager.TryGetCachedPlayerSnapshot(out SupabaseManager.PlayerSnapshot snapshot) ? snapshot.DisplayName : "Player";
+    }
     private async Task SubmitInitialSkinForOwnerAsync()
     {
         long currentSkinId = 0;
@@ -140,13 +191,14 @@ public class PlayerController : NetworkBehaviour
                 currentSkinId = refreshedSnapshot.Value.CurrentSkinId;
             }
         }
-
+        // _currentSkinID.Value = currentSkinId;
         SubmitCurrentSkinServerRpc(currentSkinId);
     }
 
     [ServerRpc]
     private void SubmitCurrentSkinServerRpc(long skinId)
     {
+        _currentSkinID.Value = skinId;
         _ = SubmitCurrentSkinServerAsync(skinId);
     }
 
@@ -178,8 +230,13 @@ public class PlayerController : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        Debug.Log($"PlayerController for client {_CurrentPlayerName.Value} is despawning. Cleaning up resources.");
         _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
-
+        _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
+        _currentSkinID.OnValueChanged -= OnSkinIDChanged;
+        _life.OnValueChanged -= (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
+        _movespeed.OnValueChanged -= (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
+        _CurrentPlayerName.OnValueChanged -= (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
         if (_currentSkinHandle.IsValid())
         {
             Addressables.ReleaseInstance(_currentSkinHandle);
@@ -193,17 +250,19 @@ public class PlayerController : NetworkBehaviour
         if (IsOwner)
         {
             currentInput = Vector2.zero;
-            if (Input.GetKey(inputUp)) currentInput = Vector2.up;
-            else if (Input.GetKey(inputDown)) currentInput = Vector2.down;
-            else if (Input.GetKey(inputLeft)) currentInput = Vector2.left;
-            else if (Input.GetKey(inputRight)) currentInput = Vector2.right;
-            
+            if(UnityChatController.IsChatting == false)
+            {
+                if (Input.GetKey(inputUp)) currentInput = Vector2.up;
+                else if (Input.GetKey(inputDown)) currentInput = Vector2.down;
+                else if (Input.GetKey(inputLeft)) currentInput = Vector2.left;
+                else if (Input.GetKey(inputRight)) currentInput = Vector2.right;
+            }
             if (IsServer)
                 hostLastInput = currentInput;
             
             playerVisual?.SetMovement(currentInput);
 
-            if (Input.GetKeyDown(KeyCode.LeftShift) && touchingBomb != null)
+            if (Input.GetKeyDown(KeyCode.LeftShift) && touchingBomb != null&& UnityChatController.IsChatting == false)
             {
                 touchingBomb.RequestPushServerRpc(playerVisual.lastDirection);
             }

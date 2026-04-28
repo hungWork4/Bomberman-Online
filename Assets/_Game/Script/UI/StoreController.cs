@@ -282,7 +282,7 @@ public class StoreController : MonoBehaviour
         foreach (var skin in skins)
         {
             SkinUI item = Instantiate(skinItemPrefab, skinListContainer);
-            string status = skin.IsOwned ? "OWNED" : "BUY";
+            string status = skin.IsOwned ? "OWN" : "BUY";
             item.SetSkinUI((int)skin.Id, skin.Name, skin.Price, status);
 
             if (item.buyButton != null)

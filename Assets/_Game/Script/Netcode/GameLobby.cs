@@ -12,7 +12,7 @@ using System.Globalization;
 using System;
 using System.Threading.Tasks;
 
-public class GameLobby : MonoBehaviour
+public class GameLobby : NetworkBehaviour
 {
     public event Action OnLobbyPlayersChanged;
     public event Action OnLobbyClosed;
@@ -33,11 +33,89 @@ public class GameLobby : MonoBehaviour
     private bool isQuittingLobby;
     private bool hasStartedGame;
     public static int maxPlayerAmount = 4;
+    private List<GameObject> spawnedBotUIs = new List<GameObject>();
+    // public int currentBotCount { get; private set; } = 0;
+    public NetworkVariable<int> currentBotCount = new NetworkVariable<int>(0, 
+    NetworkVariableReadPermission.Everyone, 
+    NetworkVariableWritePermission.Server);
+    
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject); // Xóa bản sao mới nếu đã có một Instance đang chạy
+            return;
+        }
         Instance = this;
         DontDestroyOnLoad(gameObject);
         InitializeUnityAuthentication();
+        // Đăng ký sự kiện: Khi Server bắt đầu chạy thành công thì mới Spawn
+        NetworkManager.Singleton.OnServerStarted += HandleServerStarted;
+    }
+    public override void OnNetworkSpawn()
+    {
+        // Khi giá trị thay đổi, UI sẽ tự cập nhật
+        if (IsServer)
+        {
+            currentBotCount.Value = 0; 
+            Debug.Log(">>> [Host] Đã reset syncBotCount về 0 an toàn.");
+        }
+        currentBotCount.OnValueChanged += (oldVal, newVal) => {
+            UpdateBotUI(newVal);
+        };
+        
+        // Cập nhật UI lần đầu khi vừa join
+        UpdateBotUI(currentBotCount.Value);
+    }
+
+    private void UpdateBotUI(int totalBots)
+    {
+       Debug.Log($">>> [UI] Cập nhật danh sách Bot. Số lượng: {totalBots}");
+
+        // 1. Xóa các UI Bot cũ đang tồn tại (để làm sạch danh sách)
+        foreach (var bot in spawnedBotUIs)
+        {
+            if (bot != null) Destroy(bot);
+        }
+        spawnedBotUIs.Clear();
+
+        // 2. Kiểm tra Singleton UI có tồn tại không
+        if (LobbyUI.Instance == null || LobbyUI.Instance.AiUIPrefab == null) return;
+
+        // 3. Tạo mới các UI Bot dựa trên số lượng totalBots
+        for (int i = 0; i < totalBots; i++)
+        {
+            GameObject botUI = Instantiate(LobbyUI.Instance.AiUIPrefab, LobbyUI.Instance.LobbyContainer.transform);
+            botUI.transform.localScale = Vector3.one * 1.65f;
+            
+            // Reset vị trí nếu cần (đảm bảo UI nằm đúng trong Layout Group)
+            RectTransform rect = botUI.GetComponent<RectTransform>();
+            if (rect != null) rect.anchoredPosition = Vector2.zero;
+
+            // Lưu vào danh sách để quản lý xóa sau này
+            spawnedBotUIs.Add(botUI);
+        }
+    }
+    private void HandleServerStarted()
+    {
+        // Chỉ Host mới thực hiện việc Spawn NetworkObject
+        if (IsHost) 
+        {
+            var networkObj = GetComponent<NetworkObject>();
+            if (networkObj != null && !networkObj.IsSpawned)
+            {
+                networkObj.Spawn();
+                Debug.Log(">>> [Success] GameLobby đã Spawn thành công trên Network!");
+            }
+        }
+    }
+
+    private void OnDisable() // Quan trọng: Hủy đăng ký khi object bị hủy
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnServerStarted -= HandleServerStarted;
+        }
     }
     private async void InitializeUnityAuthentication() {
         if (UnityServices.State != ServicesInitializationState.Initialized) {
@@ -47,6 +125,50 @@ public class GameLobby : MonoBehaviour
             await UnityServices.InitializeAsync(initializationOptions);
 
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
+        }
+    }
+    public async Task SetBotCount(int count)
+    {
+        if (!IsLobbyHost()) return;
+        currentBotCount.Value = count;
+        await CheckAndLockLobbyIfNeeded();
+    }
+    public async Task AddBot()
+    {
+        if(currentBotCount.Value + joinedLobby.Players.Count >= maxPlayerAmount)
+        {
+            Debug.LogWarning("Không thể thêm bot: Số lượng người chơi đã đạt tối đa.");
+            return;
+        }
+        if (!IsSpawned)
+        {
+            Debug.LogWarning("Chờ chút... NetworkObject đang được khởi tạo, hãy thử lại sau 1 giây.");
+            return;
+        }
+            Debug.Log("Adding bot...");
+        // if (!IsLobbyHost()) return;
+        currentBotCount.Value += 1;
+        // SpawnAIUIprefabServerRpc();
+        await CheckAndLockLobbyIfNeeded();
+    }
+    private async Task CheckAndLockLobbyIfNeeded()
+    {
+        if (joinedLobby == null || !IsLobbyHost()) return;
+
+        // Nếu tổng (người chơi thực + máy) >= maxPlayerAmount, tiến hành khoá phòng
+        bool shouldLock = (joinedLobby.Players.Count + currentBotCount.Value) >= maxPlayerAmount;
+
+        if (joinedLobby.IsLocked != shouldLock)
+        {
+            try
+            {
+                UpdateLobbyOptions options = new UpdateLobbyOptions { IsLocked = shouldLock };
+                joinedLobby = await LobbyService.Instance.UpdateLobbyAsync(joinedLobby.Id, options);
+            }
+            catch (LobbyServiceException e)
+            {
+                Debug.LogWarning("Update lock state failed: " + e.Message);
+            }
         }
     }
     private void Update()
@@ -70,7 +192,7 @@ public class GameLobby : MonoBehaviour
         }
     }
 
-    private bool IsLobbyHost()
+    public bool IsLobbyHost()
     {
         // Kiểm tra xem Lobby có tồn tại và người chơi hiện tại có phải Host không
         return joinedLobby != null && joinedLobby.HostId == AuthenticationService.Instance.PlayerId;
@@ -85,6 +207,13 @@ public class GameLobby : MonoBehaviour
             });
                 StartLobbyPlayersMonitor();
                 NetworkManager.Singleton.StartHost();
+
+                var networkObj = GetComponent<NetworkObject>();
+                if (networkObj != null && !networkObj.IsSpawned)
+                {
+                    networkObj.Spawn(); 
+                }
+
                 NetworkManager.Singleton.SceneManager.LoadScene("Lobby", LoadSceneMode.Single);
         } catch (LobbyServiceException e) {
             Debug.Log(e);
@@ -149,6 +278,8 @@ public class GameLobby : MonoBehaviour
                 {
                     lastPlayerSetSignature = newSignature;
                     OnLobbyPlayersChanged?.Invoke();
+                    
+                    _ = CheckAndLockLobbyIfNeeded();
                 }
 
                 if (!hasStartedGame && IsLobbyHost() && AreAllPlayersReady())

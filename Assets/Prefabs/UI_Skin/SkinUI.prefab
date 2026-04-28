@@ -140,7 +140,6 @@ MonoBehaviour:
   skinPrice: {fileID: 5459466021531589565}
   statusText: {fileID: 6874996275185156769}
   buyButton: {fileID: 7005146361661639875}
-  buyButtonText: {fileID: 0}
   skinSprites:
   - {fileID: 457474356617978424, guid: 22cd15ec83fed3b4db95f16835a5416d, type: 3}
   - {fileID: 306372094466807954, guid: 131fd62ecd3e3d24699ac2e4e38ee3b7, type: 3}
@@ -191,7 +190,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: -92}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 105.62, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3478535609611080084
 CanvasRenderer:
@@ -288,7 +287,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Padding:
-    m_Left: -11
+    m_Left: -20
     m_Right: 0
     m_Top: 0
     m_Bottom: 0
@@ -412,7 +411,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -0, y: 0.000015258789}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 103.6, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &9014160488891741404
 CanvasRenderer:
@@ -580,7 +579,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: -20.112114, w: 0}
+  m_margin: {x: 0, y: 0, z: -57.3172, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0

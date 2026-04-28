@@ -38,7 +38,7 @@ public class SkinUI : MonoBehaviour
         }
         skinName.text = "Name: "+playername;
         skinPrice.gameObject.SetActive(false);
-        statusText.text = "Status: "+ status;
+        statusText.text = ""+ status;
 
         // if (buyButton != null)
         // {

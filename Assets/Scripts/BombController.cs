@@ -9,12 +9,16 @@ public class BombController : NetworkBehaviour
     [SerializeField] private KeyCode inputKey = KeyCode.LeftShift;
     [SerializeField] private GameObject bombPrefab;
     [SerializeField] private float bombFuseTime = 3f;
-    [SerializeField] private int bombAmount = 1;
+    // [SerializeField] private int bombAmount = 1;
+    private NetworkVariable<int> bombAmount = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     //[SerializeField] private int bombsRemaining;
-    private NetworkVariable<int> bombsRemaining = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private NetworkVariable<int> bombsRemaining = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     //[SerializeField] private int explosionRadius = 1;
     [SerializeField] private NetworkVariable<int> explosionRadius = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public int ExplosionRadius { get => explosionRadius.Value; set => explosionRadius.Value = value; }
+    public int BombAmount { get => bombAmount.Value; set => bombAmount.Value = value; }
+
+    public int CurrentBombCount => bombsRemaining.Value;
 
     [Header("Destructible")]
     public Tilemap destructibleTiles;
@@ -40,7 +44,10 @@ public class BombController : NetworkBehaviour
     private void Start()
     {
         if(IsServer)
-            bombsRemaining.Value = bombAmount;
+            bombsRemaining.Value = bombAmount.Value;
+        bombAmount.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this.GetComponent<PlayerController>());
+        explosionRadius.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this.GetComponent<PlayerController>());
+
     }
     public static Transform FindDeepChild(Transform parent, string name)
     {
@@ -57,7 +64,7 @@ public class BombController : NetworkBehaviour
     }
     private void Update()
     {
-        if (bombsRemaining.Value > 0 && Input.GetKeyDown(inputKey) && IsOwner)
+        if (bombsRemaining.Value > 0 && Input.GetKeyDown(inputKey) && IsOwner && UnityChatController.IsChatting == false)
         {
             PlaceBombServerRpc();
         }
@@ -101,7 +108,7 @@ public class BombController : NetworkBehaviour
     }
     public void AddBomb()
     {
-        bombAmount++;
+        bombAmount.Value++;
         bombsRemaining.Value++;
     }
 
