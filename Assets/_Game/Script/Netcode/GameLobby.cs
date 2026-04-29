@@ -28,6 +28,7 @@ public class GameLobby : NetworkBehaviour
     // public static Game
     public static GameLobby Instance { get; private set; }
     private Lobby joinedLobby;
+    public int JoinedLobbyPlayerCount => joinedLobby?.Players?.Count ?? 0;
     private bool monitorLobbyPlayers;
     private string lastPlayerSetSignature;
     private bool isQuittingLobby;

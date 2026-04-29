@@ -24,7 +24,28 @@ public class PlayersManager : NetworkBehaviour
 
         Instance = this;
     }
+    [ServerRpc(RequireOwnership = false)]
+    public void CheckAllPlayersLoadDoneServerRpc()
+    {
+        // 1. Chỉ Server thực hiện tính toán logic
+        if (players.Count < GameLobby.Instance.JoinedLobbyPlayerCount) return;
 
+        foreach (PlayerController player in players)
+        {
+            if (player == null || player.isPlayerLoadDone.Value == false) return;
+        }
+
+        // 2. Khi tất cả đã OK, Server ra lệnh quyết định cho mọi người
+        DisableLoadingUIClientRpc();
+    }
+
+    [ClientRpc]
+    private void DisableLoadingUIClientRpc()
+    {
+        // Tất cả Client và Server đều sẽ thực hiện dòng này đồng loạt
+        Debug.Log("Server đã xác nhận tất cả xong. Tắt Loading Scene thôi!");
+        NetworkManagerUI.Instance?.DisableLoadingScene();
+    }
     public override void OnDestroy()
     {
         if (Instance == this)
@@ -37,7 +58,6 @@ public class PlayersManager : NetworkBehaviour
             NetworkManager.Singleton.ConnectionApprovalCallback = null;
         }
     }
-
     public override void OnNetworkSpawn()
     {
         if (!IsServer)
@@ -229,7 +249,9 @@ public class PlayersManager : NetworkBehaviour
     {
         trackedClients.Remove(clientId);
         clientSpawnIndices.Remove(clientId);
-
+        Debug.Log($"Client {clientId} đã thoát hoặc mất kết nối.");
+        ScoreBoardController.Instance?.playerCardsDict[clientId]?.SetPlayerLeave("DISCONNECTED...");
+        ScoreBoardController.Instance?.playerCardsDict.Remove(clientId);
         players.RemoveAll(p => p == null || (p.NetworkObject != null && p.NetworkObject.OwnerClientId == clientId));
     }
 

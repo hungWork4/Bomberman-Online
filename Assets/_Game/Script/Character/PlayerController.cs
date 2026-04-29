@@ -83,13 +83,18 @@ public class PlayerController : NetworkBehaviour
         NetworkVariableReadPermission.Everyone, 
         NetworkVariableWritePermission.Server
     );
-        public NetworkVariable<long> _currentSkinID = new NetworkVariable<long>(
+    public NetworkVariable<long> _currentSkinID = new NetworkVariable<long>(
         -1, 
         NetworkVariableReadPermission.Everyone, 
         NetworkVariableWritePermission.Server
     );
-            public NetworkVariable<FixedString32Bytes> _CurrentPlayerName = new NetworkVariable<FixedString32Bytes>(
+    public NetworkVariable<FixedString32Bytes> _CurrentPlayerName = new NetworkVariable<FixedString32Bytes>(
         "", 
+        NetworkVariableReadPermission.Everyone, 
+        NetworkVariableWritePermission.Owner
+    );
+    public NetworkVariable<bool> isPlayerLoadDone = new NetworkVariable<bool>(
+        false, 
         NetworkVariableReadPermission.Everyone, 
         NetworkVariableWritePermission.Owner
     );
@@ -104,13 +109,22 @@ public class PlayerController : NetworkBehaviour
         // Đảm bảo Rigidbody là Dynamic để va chạm hoạt động tốt
         rb.bodyType = RigidbodyType2D.Dynamic;
     }
+    // private void Start() {
+    //     if (NetworkManager.Singleton != null) {
+    //         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+    //     }
+    // }
 
+    // private void OnClientDisconnected(ulong clientId) {
+    //     Debug.Log($"Client {clientId} đã thoát hoặc mất kết nối.");
+    // }
     public override void OnNetworkSpawn()
     {
         if (IsOwner)
         {
             _CurrentPlayerName.Value = getPlayerName();
         }
+        isPlayerLoadDone.OnValueChanged += OnPlayerLoadDoneChanged;
         _currentSkinKey.OnValueChanged += OnSkinKeyChanged;
         _currentSkinID.OnValueChanged += OnSkinIDChanged;
         if (IsOwner)
@@ -145,8 +159,8 @@ public class PlayerController : NetworkBehaviour
             _lastServerPosition = spawnedPosition;
         }
         lastProcessedState = serverState.Value;
-        if(IsOwner)
-        Debug.Log("ten nguoi choi: " + SupabaseManager.CurrentPlayerSnapshot.DisplayName);
+        // if(IsOwner)
+        // Debug.Log("ten nguoi choi: " + SupabaseManager.CurrentPlayerSnapshot.DisplayName);
     }
     private void OnSkinIDChanged(long oldValue, long newValue)
     {
@@ -234,6 +248,8 @@ public class PlayerController : NetworkBehaviour
         _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
         _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
         _currentSkinID.OnValueChanged -= OnSkinIDChanged;
+        isPlayerLoadDone.OnValueChanged -= OnPlayerLoadDoneChanged;
+
         _life.OnValueChanged -= (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
         _movespeed.OnValueChanged -= (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
         _CurrentPlayerName.OnValueChanged -= (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
@@ -242,12 +258,15 @@ public class PlayerController : NetworkBehaviour
             Addressables.ReleaseInstance(_currentSkinHandle);
         }
     }
-
+    public void OnPlayerLoadDoneChanged(bool oldValue, bool newValue)
+    {
+        PlayersManager.Instance?.CheckAllPlayersLoadDoneServerRpc();
+    }
     private void Update()
     {
         if (!IsSpawned) return;
 
-        if (IsOwner)
+        if (IsOwner && isPlayerLoadDone.Value == true)
         {
             currentInput = Vector2.zero;
             if(UnityChatController.IsChatting == false)
@@ -446,7 +465,8 @@ public class PlayerController : NetworkBehaviour
         playerVisual?.SetSortingOrder(1);
         var col = GetComponent<Collider2D>();
         if (col != null) col.enabled = false;
-
+        ScoreBoardController.Instance?.playerCardsDict[OwnerClientId]?.SetPlayerLeave("DEAD...");
+        // ScoreBoardController.Instance?.playerCardsDict.Remove(OwnerClientId);
         playerVisual?.SetDead(true);
         Invoke(nameof(OnDeathSequenceEnded), 1.25f);
     }
@@ -477,6 +497,11 @@ public class PlayerController : NetworkBehaviour
             skinObj.transform.localRotation = Quaternion.identity;
 
             playerVisual = skinObj.GetComponentInChildren<PlayerVisual>(true);
+            if(IsOwner)
+            {
+                isPlayerLoadDone.Value = true;
+                Debug.Log($"Skin changed to {skinKey} for player {OwnerClientId}");
+            }
         }
         else
         {

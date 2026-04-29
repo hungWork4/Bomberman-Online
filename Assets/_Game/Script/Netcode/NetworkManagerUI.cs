@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,7 +14,7 @@ public class NetworkManagerUI : MonoBehaviour
     [SerializeField] private Button clientBtn;
     [SerializeField] private Button spawnAIBtn;
     [SerializeField] private GameObject bombermanAIPrefab;
-
+    [SerializeField] private CanvasGroup LoadingScreen;
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -23,38 +24,49 @@ public class NetworkManagerUI : MonoBehaviour
         }
         Instance = this;
 
-        serverBtn.onClick.AddListener(() =>
-        {
-            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening && PlayersManager.Instance != null)
-            {
-                NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
-                NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-                NetworkManager.Singleton.StartServer();
-            }
-        });
+        // serverBtn.onClick.AddListener(() =>
+        // {
+        //     if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening && PlayersManager.Instance != null)
+        //     {
+        //         NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
+        //         NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+        //         NetworkManager.Singleton.StartServer();
+        //     }
+        // });
 
-        hostBtn.onClick.AddListener(() =>
-        {
-            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening && PlayersManager.Instance != null)
-            {
-                NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
-                NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-                NetworkManager.Singleton.StartHost();
-            }
-        });
+        // hostBtn.onClick.AddListener(() =>
+        // {
+        //     if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening && PlayersManager.Instance != null)
+        //     {
+        //         NetworkManager.Singleton.ConnectionApprovalCallback = PlayersManager.Instance.ApprovalCheck;
+        //         NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+        //         NetworkManager.Singleton.StartHost();
+        //     }
+        // });
 
-        clientBtn.onClick.AddListener(() =>
-        {
-            if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
-            {
-                NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-                NetworkManager.Singleton.StartClient();
-            }
-        });
+        // clientBtn.onClick.AddListener(() =>
+        // {
+        //     if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
+        //     {
+        //         NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+        //         NetworkManager.Singleton.StartClient();
+        //     }
+        // });
 
-        if (spawnAIBtn != null)
+        // if (spawnAIBtn != null)
+        // {
+        //     spawnAIBtn.onClick.AddListener(() => SpawnAI());
+        // }
+    }
+    public void DisableLoadingScene()
+    {
+        if (LoadingScreen != null)
         {
-            spawnAIBtn.onClick.AddListener(() => SpawnAI());
+            LoadingScreen.DOFade(0, 1f).OnComplete(() => {
+                LoadingScreen.interactable = false;
+                LoadingScreen.blocksRaycasts = false;
+                LoadingScreen.gameObject.SetActive(false);
+            });
         }
     }
     public IEnumerator botinit()

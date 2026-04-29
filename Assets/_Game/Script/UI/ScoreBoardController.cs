@@ -11,7 +11,7 @@ public class ScoreBoardController : MonoBehaviour
 
     [SerializeField] private PlayerCard playerCardPrefab;
     [SerializeField] private Transform playerCardContainer;
-    Dictionary<ulong, PlayerCard> playerCardsDict = new Dictionary<ulong, PlayerCard>();
+    public Dictionary<ulong, PlayerCard> playerCardsDict = new Dictionary<ulong, PlayerCard>();
     void Awake()
     {
         if (Instance != null && Instance != this)

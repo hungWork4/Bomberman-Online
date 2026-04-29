@@ -13,8 +13,15 @@ public class PlayerCard : NetworkBehaviour
     [SerializeField]private Text Bombtxt;
     [SerializeField]private Text ExploreRangetxt;
     [SerializeField]private Text Speedtxt;
-    public List<Sprite> Skins;
+    [SerializeField]private GameObject disconnectPanel;
+    [SerializeField]private GameObject disconnectTxt;
 
+    public List<Sprite> Skins;
+    public void SetPlayerLeave(string text)
+    {
+        disconnectPanel.SetActive(true);
+        disconnectTxt.GetComponent<Text>().text = text;
+    }
 
     // [ServerRpc(RequireOwnership = false)]
     // public void SetPlayerCard(int skinId, string name, int life, int bomb, int exploreRange, float speed)

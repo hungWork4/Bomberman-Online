@@ -126,15 +126,16 @@ public class BombermanAI : NetworkBehaviour
             InitBehaviorTree();
         }
     }
+
     public void LockBehavior(string behaviorName, float duration)
     {
         lockedBehavior = behaviorName;
         lockBehaviorUntil = Time.time + duration;
     }
+
     public bool IsBehaviorLocked(string behaviorName)
     {
-        return lockedBehavior == behaviorName &&
-            Time.time < lockBehaviorUntil;
+        return lockedBehavior == behaviorName && Time.time < lockBehaviorUntil;
     }
     
     private void InitBehaviorTree()
@@ -277,22 +278,17 @@ public class BombermanAI : NetworkBehaviour
     {
         Vector2 snappedPos = new Vector2(Mathf.Round(pos.x), Mathf.Round(pos.y));
 
-        if (HasActiveExplosionAt(snappedPos))
-        {
-            return true;
-        }
+        if (HasActiveExplosionAt(snappedPos)) return true;
 
         Collider2D[] activeBombs = Physics2D.OverlapCircleAll(snappedPos, 10f, bombLayer);
 
         foreach (var bombCollider in activeBombs)
         {
             Vector2 bombPos = new Vector2(Mathf.Round(bombCollider.transform.position.x), Mathf.Round(bombCollider.transform.position.y));
-            int radius = bombCollider.GetComponent<Bombit>().assignedExplosionRadius.Value;
+            Bombit bombit = bombCollider.GetComponent<Bombit>();
+            int radius = bombit != null ? bombit.assignedExplosionRadius.Value : 1;
 
-            if (snappedPos == bombPos)
-            {
-                return true;
-            }
+            if (snappedPos == bombPos) return true;
 
             foreach (Vector2Int dir in cardinalDirs)
             {
@@ -300,16 +296,8 @@ public class BombermanAI : NetworkBehaviour
                 for (int i = 1; i <= radius; i++)
                 {
                     current += (Vector2)dir;
-
-                    if (IsObstacleBlockingExplosion(current))
-                    {
-                        break;
-                    }
-
-                    if (current == snappedPos)
-                    {
-                        return true;
-                    }
+                    if (IsObstacleBlockingExplosion(current)) break;
+                    if (current == snappedPos) return true;
                 }
             }
         }
@@ -335,12 +323,10 @@ public class BombermanAI : NetworkBehaviour
             for (int i = 1; i <= radius; i++)
             {
                 current += (Vector2)dir;
-
                 if (IsObstacleBlockingExplosion(current)) break;
                 if (current == snappedPos) return true;
             }
         }
-
         return false;
     }
 
@@ -353,7 +339,6 @@ public class BombermanAI : NetworkBehaviour
     private bool TryGetNextStepToSafeCellInternal(out Vector2 nextStep, bool allowExplosionTraversal)
     {
         nextStep = default;
-
         Vector2Int start = new Vector2Int(Mathf.RoundToInt(rb.position.x), Mathf.RoundToInt(rb.position.y));
 
         Queue<Vector2Int> queue = new Queue<Vector2Int>();
@@ -379,7 +364,6 @@ public class BombermanAI : NetworkBehaviour
                 {
                     step = prev;
                 }
-
                 nextStep = new Vector2(step.x, step.y);
                 return true;
             }
@@ -397,7 +381,6 @@ public class BombermanAI : NetworkBehaviour
                 queue.Enqueue(next);
             }
         }
-
         return false;
     }
 
@@ -410,11 +393,14 @@ public class BombermanAI : NetworkBehaviour
     private bool TryGetNextStepTowardInternal(Vector2 targetCell, out Vector2 nextStep, bool avoidUnsafeCells, bool allowExplosionTraversal)
     {
         nextStep = default;
-
         Vector2Int start = new Vector2Int(Mathf.RoundToInt(rb.position.x), Mathf.RoundToInt(rb.position.y));
         Vector2Int goal = new Vector2Int(Mathf.RoundToInt(targetCell.x), Mathf.RoundToInt(targetCell.y));
 
-        if (start == goal) return false;
+        if (start == goal) 
+        {
+            nextStep = new Vector2(goal.x, goal.y);
+            return true;
+        }
 
         Queue<Vector2Int> queue = new Queue<Vector2Int>();
         HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
@@ -438,7 +424,6 @@ public class BombermanAI : NetworkBehaviour
                 {
                     step = prev;
                 }
-
                 nextStep = new Vector2(step.x, step.y);
                 return true;
             }
@@ -450,7 +435,6 @@ public class BombermanAI : NetworkBehaviour
 
                 Vector2 nextWorld = new Vector2(next.x, next.y);
                 if (!IsCellWalkableInternal(nextWorld, allowExplosionTraversal)) continue;
-
                 if (avoidUnsafeCells && (IsPositionUnsafe(nextWorld) || IsInsideOwnBombBlast(nextWorld))) continue;
 
                 visited.Add(next);
@@ -458,7 +442,6 @@ public class BombermanAI : NetworkBehaviour
                 queue.Enqueue(next);
             }
         }
-
         return false;
     }
 
@@ -475,7 +458,6 @@ public class BombermanAI : NetworkBehaviour
     private bool IsCellWalkableInternal(Vector2 pos, bool allowExplosionTraversal)
     {
         if (!allowExplosionTraversal && HasActiveExplosionAt(pos)) return false;
-
         return Physics2D.OverlapCircle(pos, walkableCheckRadius, obstacleLayer) == null &&
                Physics2D.OverlapCircle(pos, walkableCheckRadius, bombLayer) == null;
     }
@@ -483,7 +465,6 @@ public class BombermanAI : NetworkBehaviour
     private bool HasActiveExplosionAt(Vector2 pos)
     {
         if (explosionLayer.value != 0 && Physics2D.OverlapCircle(pos, walkableCheckRadius, explosionLayer) != null) return true;
-
         int explosionLayerIndex = LayerMask.NameToLayer("Explosion");
         if (explosionLayerIndex < 0) return false;
 
@@ -517,7 +498,6 @@ public class BombermanAI : NetworkBehaviour
     public bool IsNextToDestructible()
     {
         if (bombsRemaining.Value <= 0) return false;
-
         Vector2 currentSnap = new Vector2(Mathf.Round(rb.position.x), Mathf.Round(rb.position.y));
         return IsAdjacentToDestructible(currentSnap);
     }
@@ -540,7 +520,6 @@ public class BombermanAI : NetworkBehaviour
         if (IsBehaviorLocked("Attack")) return true;
         if (Time.time < nextAttackAllowedTime) return false;
         if (!CanPlantBombNow()) return false;
-
         return HasPlayerInAttackRange();
     }
     
@@ -555,14 +534,16 @@ public class BombermanAI : NetworkBehaviour
         foreach (GameObject player in players)
         {
             if (player == null || !player.activeInHierarchy || player == gameObject) continue;
-            if(player.GetComponent<Collider2D>() && !player.GetComponent<Collider2D>().enabled) continue;
+            
+            Collider2D playerCol = player.GetComponent<Collider2D>();
+            if (playerCol == null || !playerCol.enabled) continue;
+
             Vector2 playerCell = new Vector2(Mathf.Round(player.transform.position.x), Mathf.Round(player.transform.position.y));
             if (Vector2.SqrMagnitude(playerCell - aiCell) <= detectionRangeSqr)
             {
                 return true;
             }
         }
-
         return false;
     }
 
@@ -585,6 +566,9 @@ public class BombermanAI : NetworkBehaviour
         {
             if (player == null || !player.activeInHierarchy || player == gameObject) continue;
 
+            Collider2D playerCol = player.GetComponent<Collider2D>();
+            if (playerCol == null || !playerCol.enabled) continue;
+
             Vector2 targetPlayerCell = new Vector2(Mathf.Round(player.transform.position.x), Mathf.Round(player.transform.position.y));
             if (Vector2.SqrMagnitude(targetPlayerCell - aiCell) > detectionRangeSqr) continue;
 
@@ -604,8 +588,7 @@ public class BombermanAI : NetworkBehaviour
                 int escapeRoutes = CountEscapeRoutesForPlayer(targetPlayerCell, candidate, ExplosionRadius);
                 float dist = candidateDist;
 
-                if (!hasTarget || escapeRoutes < predictedEscapeRoutes ||
-                    (escapeRoutes == predictedEscapeRoutes && dist < bestDist))
+                if (!hasTarget || escapeRoutes < predictedEscapeRoutes || (escapeRoutes == predictedEscapeRoutes && dist < bestDist))
                 {
                     hasTarget = true;
                     bestDist = dist;
@@ -615,14 +598,12 @@ public class BombermanAI : NetworkBehaviour
                 }
             }
         }
-
         return hasTarget;
     }
 
     public int CountEscapeRoutesForPlayer(Vector2 playerCell, Vector2 hypotheticalBombPos, int radius)
     {
         int routes = 0;
-
         foreach (Vector2Int dir in cardinalDirs)
         {
             Vector2 next = playerCell + (Vector2)dir;
@@ -630,7 +611,6 @@ public class BombermanAI : NetworkBehaviour
             if (IsInsideBombBlast(next, hypotheticalBombPos, radius) || IsPositionUnsafe(next)) continue;
             routes++;
         }
-
         return routes;
     }
 
@@ -640,7 +620,6 @@ public class BombermanAI : NetworkBehaviour
         if (destructibleTiles == null) return false;
 
         Vector2Int start = new Vector2Int(Mathf.RoundToInt(rb.position.x), Mathf.RoundToInt(rb.position.y));
-
         Queue<Vector2Int> queue = new Queue<Vector2Int>();
         HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
 
@@ -666,14 +645,12 @@ public class BombermanAI : NetworkBehaviour
             {
                 Vector2Int next = cell + dir;
                 if (visited.Contains(next)) continue;
-
                 if (!IsCellWalkable(new Vector2(next.x, next.y))) continue;
 
                 visited.Add(next);
                 queue.Enqueue(next);
             }
         }
-
         return false;
     }
 
@@ -693,7 +670,6 @@ public class BombermanAI : NetworkBehaviour
             if (pickup == null || !pickup.gameObject.activeInHierarchy) continue;
 
             Vector2 pickupCell = new Vector2(Mathf.Round(pickup.transform.position.x), Mathf.Round(pickup.transform.position.y));
-
             if (IsPositionUnsafe(pickupCell) || IsInsideOwnBombBlast(pickupCell) || !IsCellWalkable(pickupCell)) continue;
 
             float dist = Vector2.SqrMagnitude(pickupCell - current);
@@ -704,27 +680,23 @@ public class BombermanAI : NetworkBehaviour
                 hasTarget = true;
             }
         }
-
         return hasTarget;
     }
 
     private bool IsAdjacentToDestructible(Vector2 worldPos)
     {
         if (destructibleTiles == null) return false;
-
         foreach (Vector2Int dir in cardinalDirs)
         {
             Vector3Int tileCell = destructibleTiles.WorldToCell(worldPos + (Vector2)dir);
             if (destructibleTiles.GetTile(tileCell) != null) return true;
         }
-
         return false;
     }
 
     private void PlantBombAction()
     {
         if (isWaitingBombExplosion || isPlacingBomb) return;
-
         LogBehavior("Plant Bomb");
         StartCoroutine(PlaceBombRoutine());
     }
@@ -746,7 +718,6 @@ public class BombermanAI : NetworkBehaviour
     public void NotifyAttackExecuted()
     {
         if (!IsServer) return;
-
         nextAttackAllowedTime = Time.time + Mathf.Max(0f, attackCooldown);
         lockedBehavior = "";
         lockBehaviorUntil = 0f;
@@ -780,10 +751,7 @@ public class BombermanAI : NetworkBehaviour
         if (ShouldDodgeNow())
         {
             Node.Status dodgeStatus = dodgeStrategy?.Process() ?? Node.Status.Failure;
-            if (dodgeStatus == Node.Status.Running || dodgeStatus == Node.Status.Success)
-            {
-                LogBehavior("Wait Bomb Explosion");
-            }
+            if (dodgeStatus == Node.Status.Running || dodgeStatus == Node.Status.Success) LogBehavior("Wait Bomb Explosion");
         }
         else
         {
@@ -806,6 +774,7 @@ public class BombermanAI : NetworkBehaviour
             moveToItemPickupStrategy?.Reset();
         }
     }
+
     private bool CanSafelyAttackNow()
     {
         if (!CanPlantBombNow()) return false;
@@ -815,23 +784,21 @@ public class BombermanAI : NetworkBehaviour
         {
             return CanEscapeAfterBomb(attackCell);
         }
-
         return true;
     }
+
     private bool CanEscapeAfterBomb(Vector2 bombPos)
     {
         foreach (Vector2Int dir in cardinalDirs)
         {
             Vector2 next = bombPos + (Vector2)dir;
-
             if (!IsCellWalkable(next)) continue;
             if (IsInsideBombBlast(next, bombPos, ExplosionRadius)) continue;
-
             return true;
         }
-
         return false;
     }
+
     private void IdleAction()
     {
         if (CanPlantBombNearDestructible())
@@ -846,14 +813,12 @@ public class BombermanAI : NetworkBehaviour
             if (moveStatus == Node.Status.Running || moveStatus == Node.Status.Success) return;
             moveToDestructibleStrategy.Reset();
         }
-
         LogBehavior("Idle");
     }
 
     public void LogBehavior(string behaviorName)
     {
         if (lastBehaviorLogged == behaviorName) return;
-
         lastBehaviorLogged = behaviorName;
         Debug.Log($"[AI {name}] Behavior: {behaviorName}");
     }
@@ -904,7 +869,6 @@ public class BombermanAI : NetworkBehaviour
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!IsServer) return;
-
         if (other.gameObject.layer == LayerMask.NameToLayer("Explosion"))
         {
             DeathSequenceClientRpc();
@@ -920,8 +884,6 @@ public class BombermanAI : NetworkBehaviour
         {
             animator.SetBool(animIsDead, true);
         }
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null) col.enabled = false;
         DG.Tweening.DOVirtual.DelayedCall(1.5f, () =>
         {
             gameObject.SetActive(false);
@@ -951,34 +913,34 @@ public class AISmartDodge : IStrategy
         bool shouldDodge = ai.ShouldDodgeNow();
         if (!shouldDodge && currentStep == null) return Node.Status.Success;
 
-        if (shouldDodge && (currentStep == null ||
-            Vector2.Distance(rb.position, currentStep.Value) < 0.02f ||
-            !ai.IsCellWalkable(currentStep.Value) ||
-            ai.IsPositionUnsafe(currentStep.Value)))
+        Vector2 currentPos = rb.position;
+        float moveStep = ai.moveSpeed * Time.fixedDeltaTime;
+
+        // Chỉ xin cấp ô mới khi không có ô mục tiêu, HOẶC ô hiện tại không an toàn nữa
+        if (shouldDodge && (currentStep == null || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value)))
         {
             if (!ai.TryGetNextStepToSafeCell(out Vector2 nextStep))
             {
                 currentStep = null;
                 return Node.Status.Failure;
             }
-
             currentStep = nextStep;
         }
 
-        Vector2 currentPos = rb.position;
-        float moveStep = ai.moveSpeed * Time.fixedDeltaTime;
-
         ai.LogBehavior("Dodge Bomb");
+
+        // Di chuyển và kiểm tra snap
         if (Vector2.Distance(currentPos, currentStep.Value) <= moveStep + 0.001f)
         {
             rb.MovePosition(currentStep.Value);
             rb.position = currentStep.Value;
-            currentStep = null;
-            return Node.Status.Running;
+            currentStep = null; // Snap xong mới được phép null để tính ô kế!
         }
-
-        Vector2 nextPos = ai.GetAxisLockedMovePosition(currentPos, currentStep.Value, moveStep);
-        rb.MovePosition(nextPos);
+        else
+        {
+            Vector2 nextPos = ai.GetAxisLockedMovePosition(currentPos, currentStep.Value, moveStep);
+            rb.MovePosition(nextPos);
+        }
 
         if (Vector2.Distance(currentPos, lastPosition) < 0.001f)
         {
@@ -993,14 +955,9 @@ public class AISmartDodge : IStrategy
         {
             stuckTimer = 0f;
         }
-
         lastPosition = currentPos;
+
         return Node.Status.Running;
-    }
-    
-    public Vector2 SnapToGrid(Vector2 pos)
-    {
-        return new Vector2(Mathf.Round(pos.x * 2f) / 2f, Mathf.Round(pos.y * 2f) / 2f);
     }
     
     public void Reset()
@@ -1037,14 +994,19 @@ public class AIMoveToNearestDestructible : IStrategy
         if (targetPoint == null || ai.IsPositionUnsafe(targetPoint.Value) || !ai.IsCellWalkable(targetPoint.Value))
         {
             if (!ai.TryGetNearestDestructibleApproach(out Vector2 foundTarget)) return Node.Status.Failure;
-            targetPoint = foundTarget;
-            currentStep = null;
+            
+            // Chỉ xóa bước đi hiện tại nếu điểm cuối thực sự bị thay đổi
+            if (targetPoint == null || Vector2.Distance(targetPoint.Value, foundTarget) > 0.1f)
+            {
+                targetPoint = foundTarget;
+                currentStep = null;
+            }
         }
 
         Vector2 currentPos = rb.position;
         float moveStep = ai.moveSpeed * Time.fixedDeltaTime;
 
-        if (currentStep == null || Vector2.Distance(currentPos, currentStep.Value) < 0.05f || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value))
+        if (currentStep == null || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value))
         {
             if (!ai.TryGetNextStepToward(targetPoint.Value, out Vector2 nextStep))
             {
@@ -1059,6 +1021,10 @@ public class AIMoveToNearestDestructible : IStrategy
         {
             rb.MovePosition(currentStep.Value);
             rb.position = currentStep.Value;
+            currentStep = null;
+            
+            // Reached target
+            if (Vector2.Distance(rb.position, targetPoint.Value) < 0.05f) Reset();
         }
         else
         {
@@ -1069,24 +1035,13 @@ public class AIMoveToNearestDestructible : IStrategy
         if (Vector2.Distance(currentPos, lastPosition) < 0.001f)
         {
             stuckTimer += Time.fixedDeltaTime;
-            if (stuckTimer >= 0.35f)
-            {
-                Reset();
-            }
+            if (stuckTimer >= 0.35f) Reset();
         }
         else
         {
             stuckTimer = 0f;
         }
         lastPosition = currentPos;
-
-        if (Vector2.Distance(currentPos, currentStep.Value) <= moveStep + 0.001f)
-        {
-            if (Vector2.Distance(currentStep.Value, targetPoint.Value) < 0.05f)
-            {
-                Reset();
-            }
-        }
 
         return Node.Status.Running;
     }
@@ -1136,10 +1091,15 @@ public class AIAttackPlayer : IStrategy
             }
 
             playerCell = foundPlayerCell;
-            attackCell = foundAttackCell;
+            
+            // Đảm bảo không ngắt ngang nhịp di chuyển nếu mục tiêu của user không đổi sang ô khác
+            if (attackCell == null || Vector2.Distance(attackCell.Value, foundAttackCell) > 0.1f)
+            {
+                attackCell = foundAttackCell;
+                currentStep = null; 
+            }
             cachedEscapeRoutes = escapeRoutes;
             repathTimer = 0.5f; 
-            currentStep = null; 
         }
 
         ai.LockBehavior("Attack", 1.0f);
@@ -1155,11 +1115,10 @@ public class AIAttackPlayer : IStrategy
                 Reset();
                 return Node.Status.Success;
             }
-
             return Node.Status.Failure;
         }
 
-        if (currentStep == null || Vector2.Distance(currentPos, currentStep.Value) < 0.05f || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value))
+        if (currentStep == null || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value))
         {
             if (!ai.TryGetNextStepToward(attackCell.Value, out Vector2 nextStep))
             {
@@ -1174,6 +1133,7 @@ public class AIAttackPlayer : IStrategy
         {
             rb.MovePosition(currentStep.Value);
             rb.position = currentStep.Value;
+            currentStep = null;
         }
         else
         {
@@ -1184,10 +1144,7 @@ public class AIAttackPlayer : IStrategy
         if (Vector2.Distance(currentPos, lastPosition) < 0.001f)
         {
             stuckTimer += Time.fixedDeltaTime;
-            if (stuckTimer >= 0.35f)
-            {
-                Reset();
-            }
+            if (stuckTimer >= 0.35f) Reset();
         }
         else
         {
@@ -1229,20 +1186,18 @@ public class AIMoveToNearestItemPickup : IStrategy
         if (targetPoint == null || ai.IsPositionUnsafe(targetPoint.Value) || !ai.IsCellWalkable(targetPoint.Value))
         {
             if (!ai.TryGetNearestItemPickup(out Vector2 foundTarget)) return Node.Status.Failure;
-            targetPoint = foundTarget;
-            currentStep = null;
+            
+            if (targetPoint == null || Vector2.Distance(targetPoint.Value, foundTarget) > 0.1f)
+            {
+                targetPoint = foundTarget;
+                currentStep = null;
+            }
         }
 
         Vector2 currentPos = rb.position;
         float moveStep = ai.moveSpeed * Time.fixedDeltaTime;
 
-        if (Vector2.Distance(currentPos, targetPoint.Value) < 0.05f)
-        {
-            Reset();
-            return Node.Status.Success;
-        }
-
-        if (currentStep == null || Vector2.Distance(currentPos, currentStep.Value) < 0.05f || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value))
+        if (currentStep == null || !ai.IsCellWalkable(currentStep.Value) || ai.IsPositionUnsafe(currentStep.Value))
         {
             if (!ai.TryGetNextStepToward(targetPoint.Value, out Vector2 nextStep))
             {
@@ -1257,6 +1212,9 @@ public class AIMoveToNearestItemPickup : IStrategy
         {
             rb.MovePosition(currentStep.Value);
             rb.position = currentStep.Value;
+            currentStep = null;
+            
+            if (Vector2.Distance(rb.position, targetPoint.Value) < 0.05f) Reset();
         }
         else
         {
@@ -1267,24 +1225,13 @@ public class AIMoveToNearestItemPickup : IStrategy
         if (Vector2.Distance(currentPos, lastPosition) < 0.001f)
         {
             stuckTimer += Time.fixedDeltaTime;
-            if (stuckTimer >= 0.35f)
-            {
-                Reset();
-            }
+            if (stuckTimer >= 0.35f) Reset();
         }
         else
         {
             stuckTimer = 0f;
         }
         lastPosition = currentPos;
-
-        if (Vector2.Distance(currentPos, currentStep.Value) <= moveStep + 0.001f)
-        {
-            if (targetPoint.HasValue && Vector2.Distance(currentStep.Value, targetPoint.Value) < 0.05f)
-            {
-                Reset();
-            }
-        }
 
         return Node.Status.Running;
     }
