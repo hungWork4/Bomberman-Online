@@ -257,6 +257,19 @@ namespace SlimUI.ModernMenu{
 			exitMenu.SetActive(false);
 		}
 
+		public void Logout(){
+			SupabaseManager.ClearAuthContext();
+			PlayerPrefs.DeleteKey("SupabaseUserId");
+			PlayerPrefs.DeleteKey("SupabaseAccessToken");
+			PlayerPrefs.DeleteKey("SupabaseRefreshToken");
+			PlayerPrefs.DeleteKey("Account");
+			PlayerPrefs.DeleteKey("SupabasePendingUsername");
+			PlayerPrefs.DeleteKey("SupabasePendingEmail");
+			PlayerPrefs.DeleteKey("SupabasePendingDisplayName");
+			PlayerPrefs.Save();
+			LoadScene("Login");
+		}
+
 		public void QuitGame(){
 			#if UNITY_EDITOR
 				UnityEditor.EditorApplication.isPlaying = false;

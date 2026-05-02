@@ -118,7 +118,7 @@ public class SelectSkinUI : MonoBehaviour
             SkinUI item = Instantiate(skinItemPrefab, skinListContainer);
             bool isEquipped = skin.Id == currentEquippedSkinId;
             bool isSelected = pendingSelectedSkinId.HasValue && skin.Id == pendingSelectedSkinId.Value;
-            string status = isEquipped ? "EQUIPPED" : (isSelected ? "SELECTED" : "OWNED");
+            string status = isEquipped ? "LẮP" : (isSelected ? "CHỌN" : "SỞ HỮU");
             item.SetSkinPlayerLobbyUI((int)skin.Id, skin.Name, status);
             ApplyHighlight(item, isEquipped, isSelected);
 

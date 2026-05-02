@@ -451,7 +451,14 @@ public class PlayerController : NetworkBehaviour
 
         if (other.gameObject.layer == LayerMask.NameToLayer("Explosion"))
         {
+            if (_life.Value <= 0)
+            {
+                return;
+            }
+
+            _life.Value = 0;
             DeathSequenceClientRpc();
+            PlayersManager.Instance?.CheckWinStateServer();
         }
     }
 

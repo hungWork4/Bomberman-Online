@@ -145,6 +145,7 @@ public class UnityChatController : MonoBehaviour
 
     public void ActivateChat()
     {
+        Debug.Log("Activating chat input field.");
         IsChatting = true;
         if (chatInputField != null) chatInputField.ActivateInputField();
         Cursor.lockState = CursorLockMode.None;
@@ -155,8 +156,8 @@ public class UnityChatController : MonoBehaviour
     {
         IsChatting = false;
         if (chatInputField != null) chatInputField.DeactivateInputField();
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     public async void SendChatMessage()

@@ -29,7 +29,7 @@ public class SkinUI : MonoBehaviour
             buyButton.gameObject.SetActive(true);
         }
     }
-    public void SetSkinPlayerLobbyUI(int skinid, string playername, string status ="NONE")
+    public void SetSkinPlayerLobbyUI(int skinid, string playername, string status ="CHƯA")
     {
         // Giả sử bạn có một hệ thống để lấy sprite từ asset key
         if (skinSprites != null && skinid >= 0 && skinid < skinSprites.Count)

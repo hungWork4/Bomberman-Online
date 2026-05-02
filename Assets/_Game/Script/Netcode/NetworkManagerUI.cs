@@ -5,6 +5,8 @@ using DG.Tweening;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
 
 public class NetworkManagerUI : MonoBehaviour
 {
@@ -12,6 +14,7 @@ public class NetworkManagerUI : MonoBehaviour
     [SerializeField] private Button serverBtn;
     [SerializeField] private Button hostBtn;
     [SerializeField] private Button clientBtn;
+    [SerializeField] private Button leaveMatchBtn;
     [SerializeField] private Button spawnAIBtn;
     [SerializeField] private GameObject bombermanAIPrefab;
     [SerializeField] private CanvasGroup LoadingScreen;
@@ -23,6 +26,14 @@ public class NetworkManagerUI : MonoBehaviour
             return;
         }
         Instance = this;
+
+        if (leaveMatchBtn != null)
+        {
+            Navigation navigation = leaveMatchBtn.navigation;
+            navigation.mode = Navigation.Mode.None;
+            leaveMatchBtn.navigation = navigation;
+            leaveMatchBtn.onClick.AddListener(LeaveMatch);
+        }
 
         // serverBtn.onClick.AddListener(() =>
         // {
@@ -58,6 +69,37 @@ public class NetworkManagerUI : MonoBehaviour
         //     spawnAIBtn.onClick.AddListener(() => SpawnAI());
         // }
     }
+
+    private void OnDestroy()
+    {
+        if (leaveMatchBtn != null)
+        {
+            leaveMatchBtn.onClick.RemoveListener(LeaveMatch);
+        }
+    }
+
+    public void LeaveMatch()
+    {
+        if (GameLobby.Instance != null)
+        {
+            // if (GameLobby.Instance.IsLobbyHost() && GameLobby.Instance.JoinedLobbyPlayerCount > 1)
+            // {
+            //     Debug.LogWarning("Host không thể rời trận khi vẫn còn người chơi khác trong phòng.");
+            //     return;
+            // }
+
+            GameLobby.Instance.QuitLobby();
+            return;
+        }
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+
+        SceneManager.LoadScene("MainMenu", LoadSceneMode.Single);
+    }
+
     public void DisableLoadingScene()
     {
         if (LoadingScreen != null)
@@ -69,6 +111,20 @@ public class NetworkManagerUI : MonoBehaviour
             });
         }
     }
+
+    private void Update()
+    {
+        if (leaveMatchBtn == null || EventSystem.current == null)
+        {
+            return;
+        }
+
+        if (EventSystem.current.currentSelectedGameObject == leaveMatchBtn.gameObject)
+        {
+            EventSystem.current.SetSelectedGameObject(null);
+        }
+    }
+
     public IEnumerator botinit()
     {
         yield return new WaitForSeconds(2f); // Đợi một chút để đảm bảo mọi thứ đã sẵn sàng

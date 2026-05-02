@@ -13,6 +13,9 @@ public class PlayersManager : NetworkBehaviour
     private readonly HashSet<ulong> trackedClients = new HashSet<ulong>();
     private readonly Dictionary<ulong, int> clientSpawnIndices = new Dictionary<ulong, int>();
     private int nextSpawnPointIndex;
+    private bool matchEnded;
+    private int lastAlivePlayers = -1;
+    private int lastAliveBots = -1;
 
     private void Awake()
     {
@@ -65,6 +68,10 @@ public class PlayersManager : NetworkBehaviour
             return;
         }
 
+        matchEnded = false;
+        lastAlivePlayers = -1;
+        lastAliveBots = -1;
+
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
         if (NetworkManager.Singleton.SceneManager != null)
@@ -105,12 +112,95 @@ public class PlayersManager : NetworkBehaviour
 
         if (sceneEvent.SceneEventType == SceneEventType.LoadEventCompleted && sceneEvent.SceneName == "Bomberman")
         {
+            matchEnded = false;
+            lastAlivePlayers = -1;
+            lastAliveBots = -1;
             StartCoroutine(PlaceAllPlayersAtSpawnPointsWhenReady());
             if(NetworkManagerUI.Instance != null)
             {
                 StartCoroutine(NetworkManagerUI.Instance.botinit());
             }
         }
+    }
+
+    public void CheckWinStateServer()
+    {
+        if (!IsServer || matchEnded)
+        {
+            return;
+        }
+
+        int alivePlayers = 0;
+        ulong lastAlivePlayerId = 0;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerController player = players[i];
+            if (player == null)
+            {
+                continue;
+            }
+
+            if (player.Life <= 0)
+            {
+                continue;
+            }
+
+            if (player.NetworkObject == null || !player.NetworkObject.IsSpawned)
+            {
+                continue;
+            }
+
+            alivePlayers++;
+            lastAlivePlayerId = player.OwnerClientId;
+        }
+
+        int aliveBots = 0;
+        BombermanAI[] bots = FindObjectsOfType<BombermanAI>();
+        for (int i = 0; i < bots.Length; i++)
+        {
+            BombermanAI bot = bots[i];
+            if (bot == null || bot.IsDead || !bot.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            aliveBots++;
+        }
+
+        if (alivePlayers == lastAlivePlayers && aliveBots == lastAliveBots)
+        {
+            return;
+        }
+
+        lastAlivePlayers = alivePlayers;
+        lastAliveBots = aliveBots;
+
+        if (alivePlayers == 1 && aliveBots == 0)
+        {
+            matchEnded = true;
+            ShowEndCardClientRpc(lastAlivePlayerId, true);
+        }
+        else if (alivePlayers == 0 && aliveBots >= 0)
+        {
+            matchEnded = true;
+            ShowEndCardClientRpc(0, false);
+        }
+    }
+
+    [ClientRpc]
+    private void ShowEndCardClientRpc(ulong winnerClientId, bool hasWinner)
+    {
+        EndCard endCard = FindObjectOfType<EndCard>();
+        if (endCard == null)
+        {
+            Debug.LogWarning("EndCard not found in scene.");
+            return;
+        }
+
+        bool isWinner = hasWinner && NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == winnerClientId;
+        string resultText = hasWinner ? (isWinner ? "WIN" : "LOSE") : "LOSE";
+        endCard.ShowResult(resultText);
     }
 
     private IEnumerator PlaceAllPlayersAtSpawnPointsWhenReady()

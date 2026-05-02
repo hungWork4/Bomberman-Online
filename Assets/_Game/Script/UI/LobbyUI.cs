@@ -212,7 +212,7 @@ public class LobbyUI : MonoBehaviour
             }
 
             playerInfoMap[player.PlayerId] = player;
-            playerUI.SetSkinPlayerLobbyUI(player.SkinId, player.DisplayName, player.IsReady ? "READY" : "NONE");
+            playerUI.SetSkinPlayerLobbyUI(player.SkinId, player.DisplayName, player.IsReady ? "SẴN SÀNG" : "CHƯA");
         }
     }
 
@@ -236,7 +236,7 @@ public class LobbyUI : MonoBehaviour
 
         playerInfo.SkinId = skinId;
         playerInfoMap[localPlayerId] = playerInfo;
-        playerUI.SetSkinPlayerLobbyUI(skinId, playerInfo.DisplayName, playerInfo.IsReady ? "READY" : "NONE");
+        playerUI.SetSkinPlayerLobbyUI(skinId, playerInfo.DisplayName, playerInfo.IsReady ? "SẴN SÀNG" : "CHƯA");
     }
 
     private void UpdateLobbyInfoText()

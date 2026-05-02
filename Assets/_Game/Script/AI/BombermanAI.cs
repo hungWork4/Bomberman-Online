@@ -47,6 +47,7 @@ public class BombermanAI : NetworkBehaviour
     private AIMoveToNearestItemPickup moveToItemPickupStrategy;
     private AIMoveToNearestDestructible moveToDestructibleStrategy;
     private bool isDead = false;
+    public bool IsDead => isDead;
     private bool isWaitingBombExplosion;
     private bool isPlacingBomb;
     private bool hasActiveOwnBomb;
@@ -871,7 +872,14 @@ public class BombermanAI : NetworkBehaviour
         if (!IsServer) return;
         if (other.gameObject.layer == LayerMask.NameToLayer("Explosion"))
         {
+            if (isDead)
+            {
+                return;
+            }
+
+            isDead = true;
             DeathSequenceClientRpc();
+            PlayersManager.Instance?.CheckWinStateServer();
         }
     }
 
