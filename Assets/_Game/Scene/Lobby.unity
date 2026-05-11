@@ -1118,8 +1118,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: 2a8dff261e96db642a7f33463c5343eb, type: 3}
-    m_FontSize: 26
+    m_Font: {fileID: 12800000, guid: a224b67f39e977442a251b304821c34e, type: 3}
+    m_FontSize: 21
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 0
@@ -1130,7 +1130,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: ADD BOT
+  m_Text: "Th\xEAm M\xE1y"
 --- !u!222 &969511520
 CanvasRenderer:
   m_ObjectHideFlags: 0
