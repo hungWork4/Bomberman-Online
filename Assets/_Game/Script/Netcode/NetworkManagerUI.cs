@@ -127,8 +127,23 @@ public class NetworkManagerUI : MonoBehaviour
 
     public IEnumerator botinit()
     {
-        yield return new WaitForSeconds(2f); // Đợi một chút để đảm bảo mọi thứ đã sẵn sàng
-        if(GameLobby.Instance != null )
+        // Đợi player object được spawn đầy đủ để tránh bot lấy nhầm vị trí
+        int waitFrames = 0;
+        while (waitFrames < 300)
+        {
+            if (GameLobby.Instance != null && PlayersManager.Instance != null)
+            {
+                if (PlayersManager.Instance.players.Count >= GameLobby.Instance.JoinedLobbyPlayerCount)
+                {
+                    break;
+                }
+            }
+
+            waitFrames++;
+            yield return null;
+        }
+
+        if (GameLobby.Instance != null)
         {
             int totalBot =GameLobby.Instance.currentBotCount.Value;
             for (int i=0; i < totalBot; i++)
@@ -141,25 +156,24 @@ public class NetworkManagerUI : MonoBehaviour
     {
         var spawnPoints = PlayersManager.Instance.spawnPoints;
         spawnPoint = null;
-        var players = PlayersManager.Instance.players;
-
-        // Tìm index của player trong danh sách quản lý
-
-        int AIIndex = players.Count+index; // Giả sử AI sẽ được thêm vào sau cùng, nên index của AI sẽ là số lượng player hiện tại
-
-        // Nếu không tìm thấy player trong list
-        if (AIIndex == -1)
+        if (spawnPoints == null || spawnPoints.Count == 0)
         {
-            Debug.LogWarning("Player không tồn tại trong danh sách quản lý của PlayersManager.");
             return false;
         }
 
-        // Ánh xạ index: Nếu playerIndex vượt quá số lượng spawnPoints, dùng phép chia lấy dư (loop)
-        // Hoặc nếu bạn muốn giới hạn cứng thì chỉ cần: if (playerIndex < spawnPoints.Count)
-        int spawnIndex = AIIndex % spawnPoints.Count;
+        int playerCount = PlayersManager.Instance.players.Count;
+        if (GameLobby.Instance != null && GameLobby.Instance.JoinedLobbyPlayerCount > 0)
+        {
+            playerCount = GameLobby.Instance.JoinedLobbyPlayerCount;
+        }
 
-        spawnPoint = spawnPoints[spawnIndex];
-        
+        int aiIndex = playerCount + index;
+        if (aiIndex < 0 || aiIndex >= spawnPoints.Count)
+        {
+            return false;
+        }
+
+        spawnPoint = spawnPoints[aiIndex];
         return spawnPoint != null;
     }
     private void SpawnAI(int index =0)
