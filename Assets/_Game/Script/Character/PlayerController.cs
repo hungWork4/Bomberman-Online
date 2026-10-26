@@ -5,7 +5,6 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.AddressableAssets;
 using Unity.Collections;
 using System.Threading.Tasks;
-using UnityEngine.SocialPlatforms.Impl;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : NetworkBehaviour
@@ -30,9 +29,22 @@ public class PlayerController : NetworkBehaviour
     public KeyCode inputLeft = KeyCode.A;
     public KeyCode inputRight = KeyCode.D;
 
-    // =========================
-    // 🔥 OPTIMIZED SYNC VARIABLES
-    // =========================
+    // ==========================================
+    // 🚀 CLIENT-AUTHORITATIVE DEAD RECKONING SYNC
+    // ==========================================
+    private readonly NetworkVariable<Vector2> _networkPosition = new NetworkVariable<Vector2>(
+        Vector2.zero,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner
+    );
+
+    private readonly NetworkVariable<Vector2> _moveDirection = new NetworkVariable<Vector2>(
+        Vector2.zero,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner
+    );
+
+    // Backward compatibility structs
     public struct InputPayload : INetworkSerializable
     {
         public int tick;
@@ -50,7 +62,6 @@ public class PlayerController : NetworkBehaviour
             serializer.SerializeValue(ref prevDir3);
         }
     }
-
 
     public struct StatePayload : INetworkSerializable, System.IEquatable<StatePayload>
     {
@@ -106,6 +117,9 @@ public class PlayerController : NetworkBehaviour
 
     private void Awake()
     {
+        Application.runInBackground = true;
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 60;
         rb = GetComponent<Rigidbody2D>();
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
@@ -113,6 +127,7 @@ public class PlayerController : NetworkBehaviour
         rb.bodyType = RigidbodyType2D.Kinematic;
         rb.useFullKinematicContacts = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        rb.interpolation = RigidbodyInterpolation2D.None;
 
         _circleCollider = GetComponent<CircleCollider2D>();
         if (_circleCollider != null)
@@ -132,24 +147,27 @@ public class PlayerController : NetworkBehaviour
             }
         }
     }
-    // private void Start() {
-    //     if (NetworkManager.Singleton != null) {
-    //         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
-    //     }
-    // }
 
-    // private void OnClientDisconnected(ulong clientId) {
-    //     Debug.Log($"Client {clientId} đã thoát hoặc mất kết nối.");
-    // }
     public override void OnNetworkSpawn()
     {
         if (IsOwner)
         {
             _CurrentPlayerName.Value = getPlayerName();
+            _networkPosition.Value = transform.position;
         }
+        else
+        {
+            if (_networkPosition.Value != Vector2.zero)
+            {
+                transform.position = _networkPosition.Value;
+                if (rb != null) rb.position = _networkPosition.Value;
+            }
+        }
+
         isPlayerLoadDone.OnValueChanged += OnPlayerLoadDoneChanged;
         _currentSkinKey.OnValueChanged += OnSkinKeyChanged;
         _currentSkinID.OnValueChanged += OnSkinIDChanged;
+
         if (IsOwner)
         {
             _ = SubmitInitialSkinForOwnerAsync();
@@ -159,8 +177,7 @@ public class PlayerController : NetworkBehaviour
         {
             ChangeSkinByKey(initialSkinKey);
         }
-        // ScoreBoardController.Instance?.SpawnPlayerCard(this);
-        // ScoreBoardController.Instance?.UpdatePlayerCard(this);
+
         if (_currentSkinID.Value != -1)
         {
             InitializeScoreboard();
@@ -168,28 +185,14 @@ public class PlayerController : NetworkBehaviour
         _life.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
         _movespeed.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
         _CurrentPlayerName.OnValueChanged += (oldValue, newValue) => ScoreBoardController.Instance?.UpdatePlayerCard(this);
+        
         Vector2 spawnedPosition = transform.position;
-        rb.position = spawnedPosition;
-
-        if (IsServer)
+        if (rb != null)
         {
-            serverState.Value = new StatePayload
-            {
-                tick = 0,
-                position = spawnedPosition,
-                velocity = Vector2.zero
-            };
+            rb.position = spawnedPosition;
         }
-
-        if (IsServer)
-        {
-            var serverController = gameObject.AddComponent<ServerPlayerController>();
-            serverController.Initialize(this);
-        }
-
-        var clientController = gameObject.AddComponent<ClientPlayerController>();
-        clientController.Initialize(this);
     }
+
     private void OnSkinIDChanged(long oldValue, long newValue)
     {
         if (newValue != -1)
@@ -200,23 +203,18 @@ public class PlayerController : NetworkBehaviour
 
     private void InitializeScoreboard()
     {
-        // Đảm bảo ScoreBoard đã sẵn sàng
         if (ScoreBoardController.Instance != null)
         {
             ScoreBoardController.Instance.SpawnPlayerCard(this);
             ScoreBoardController.Instance.UpdatePlayerCard(this);
         }
     }
-    // private void OnSkinIDChanged(long oldValue, long newValue)
-    // {
-    //     // Mỗi khi ID thay đổi, đảm bảo Card đã tồn tại và cập nhật
-    //     ScoreBoardController.Instance?.SpawnPlayerCard(this);
-    //     ScoreBoardController.Instance?.UpdatePlayerCard(this);
-    // }
+
     public string getPlayerName()
     {
         return SupabaseManager.TryGetCachedPlayerSnapshot(out SupabaseManager.PlayerSnapshot snapshot) ? snapshot.DisplayName : "Player";
     }
+
     private async Task SubmitInitialSkinForOwnerAsync()
     {
         long currentSkinId = 0;
@@ -233,7 +231,7 @@ public class PlayerController : NetworkBehaviour
                 currentSkinId = refreshedSnapshot.Value.CurrentSkinId;
             }
         }
-        // _currentSkinID.Value = currentSkinId;
+
         SubmitCurrentSkinServerRpc(currentSkinId);
     }
 
@@ -274,7 +272,6 @@ public class PlayerController : NetworkBehaviour
     {
         Debug.Log($"PlayerController for client {_CurrentPlayerName.Value} is despawning. Cleaning up resources.");
         _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
-        _currentSkinKey.OnValueChanged -= OnSkinKeyChanged;
         _currentSkinID.OnValueChanged -= OnSkinIDChanged;
         isPlayerLoadDone.OnValueChanged -= OnPlayerLoadDoneChanged;
 
@@ -285,24 +282,104 @@ public class PlayerController : NetworkBehaviour
         {
             Addressables.ReleaseInstance(_currentSkinHandle);
         }
-
-        var clientController = GetComponent<ClientPlayerController>();
-        if (clientController != null) Destroy(clientController);
-        var serverController = GetComponent<ServerPlayerController>();
-        if (serverController != null) Destroy(serverController);
     }
+
     public void OnPlayerLoadDoneChanged(bool oldValue, bool newValue)
     {
         PlayersManager.Instance?.CheckAllPlayersLoadDoneServerRpc();
     }
+
     private void Update()
     {
         CheckTouchingBomb();
+
+        if (IsOwner)
+        {
+            Vector2 input = Vector2.zero;
+            if (isPlayerLoadDone.Value && !UnityChatController.IsChatting)
+            {
+                if (Input.GetKey(inputUp)) input = Vector2.up;
+                else if (Input.GetKey(inputDown)) input = Vector2.down;
+                else if (Input.GetKey(inputLeft)) input = Vector2.left;
+                else if (Input.GetKey(inputRight)) input = Vector2.right;
+
+                if (Input.GetKeyDown(KeyCode.LeftShift) && touchingBomb != null)
+                {
+                    Vector2 pushDir = playerVisual != null ? playerVisual.lastDirection : input;
+                    if (pushDir != Vector2.zero)
+                    {
+                        touchingBomb.RequestPushServerRpc(pushDir);
+                    }
+                }
+            }
+
+            // Sync animation state
+            if (_moveDirection.Value != input)
+            {
+                _moveDirection.Value = input;
+            }
+
+            // Visual for local player
+            playerVisual?.SetMovement(input);
+
+            // 0ms Latency Local Movement via Kinematic Simulation + Corner Slip
+            if (input != Vector2.zero)
+            {
+                Vector2 nextPos = SimulateStep(transform.position, input, Time.deltaTime);
+                transform.position = nextPos;
+                if (rb != null)
+                {
+                    rb.position = nextPos;
+                }
+            }
+
+            // Replicate authoritative position to remote clients & server
+            Vector2 currentOwnerPos = transform.position;
+            if (_networkPosition.Value != currentOwnerPos)
+            {
+                _networkPosition.Value = currentOwnerPos;
+            }
+        }
+        else
+        {
+            // ========================================================
+            // 🎮 NON-OWNERS: CRISP 60HZ RESPONSIVE FOLLOWING
+            // Follow authoritative position directly with adaptive speed
+            // ========================================================
+            Vector2 currentPos = transform.position;
+            Vector2 targetPos = _networkPosition.Value;
+            Vector2 moveDir = _moveDirection.Value;
+
+            if (targetPos != Vector2.zero)
+            {
+                float dist = Vector2.Distance(currentPos, targetPos);
+
+                if (dist > 1.5f)
+                {
+                    // Snap trên teleport / spawn round mới
+                    currentPos = targetPos;
+                }
+                else if (dist > 0.001f)
+                {
+                    // Tốc độ bám: ít nhất bằng moveSpeed thật của nhân vật,
+                    // và tự động tăng tốc thích ứng theo khoảng cách để triệt tiêu độ trễ mạng
+                    float followSpeed = Mathf.Max(moveSpeed, dist * 25f);
+                    currentPos = Vector2.MoveTowards(currentPos, targetPos, followSpeed * Time.deltaTime);
+                }
+
+                transform.position = currentPos;
+                if (rb != null)
+                {
+                    rb.position = currentPos;
+                }
+            }
+
+            playerVisual?.SetMovement(moveDir);
+        }
     }
 
     private static readonly RaycastHit2D[] _circleCastHitBuffer = new RaycastHit2D[16];
     private static readonly Collider2D[] _overlapColliderBuffer = new Collider2D[8];
-    private static readonly Collider2D[] _depenetrateColliderBuffer = new Collider2D[8];
 
     private void CheckTouchingBomb()
     {
@@ -335,42 +412,6 @@ public class PlayerController : NetworkBehaviour
         if (_colliderOffset != Vector2.zero) return _colliderOffset;
         var col = GetComponent<Collider2D>();
         return col != null ? col.offset : Vector2.zero;
-    }
-
-    /// <summary>
-    /// Chống kẹt: Tự động phát hiện và đẩy tâm nhân vật ra ngoài nếu bị lún/chạm collider mép tường/bom
-    /// </summary>
-    private Vector2 ResolveDepenetration(Vector2 center, float radius, int mask)
-    {
-        int count = Physics2D.OverlapCircleNonAlloc(center, radius, _depenetrateColliderBuffer, mask);
-        for (int i = 0; i < count; i++)
-        {
-            Collider2D col = _depenetrateColliderBuffer[i];
-            if (col == null || col.isTrigger) continue;
-            if (col.transform == transform || col.transform.IsChildOf(transform)) continue;
-
-            Vector2 closestPoint = col.ClosestPoint(center);
-            Vector2 diff = center - closestPoint;
-            float distSqr = diff.sqrMagnitude;
-
-            // Nếu tâm nhân vật nằm ngoài nhưng hình tròn bị lún vào collider
-            if (distSqr > 0.000001f && distSqr < radius * radius)
-            {
-                float dist = Mathf.Sqrt(distSqr);
-                float penetration = radius - dist;
-                Vector2 pushDir = diff / dist;
-                center += pushDir * (penetration + 0.002f);
-            }
-            // Trường hợp tâm nhân vật bị lọt hẳn vào trong collider
-            else if (distSqr <= 0.000001f)
-            {
-                Vector2 colCenter = col.bounds.center;
-                Vector2 escapeDir = (center - colCenter).normalized;
-                if (escapeDir == Vector2.zero) escapeDir = Vector2.up;
-                center += escapeDir * (radius + 0.01f);
-            }
-        }
-        return center;
     }
 
     private float CastCircleInDirection(Vector2 origin, float radius, Vector2 direction, float distance, int mask)
@@ -421,9 +462,6 @@ public class PlayerController : NetworkBehaviour
         float radius = GetPlayerColliderRadius();
         Vector2 offset = GetPlayerColliderOffset();
         Vector2 center = currentPos + offset;
-
-        // 0. Giải phóng lún collider trước khi di chuyển (chống kẹt khi đứng sát mép)
-        center = ResolveDepenetration(center, radius, mask);
 
         const float skinWidth = 0.005f;
 
@@ -477,9 +515,6 @@ public class PlayerController : NetworkBehaviour
             }
         }
 
-        // 3. Đảm bảo vị trí cuối cùng không bị lún vào bất kỳ vật cản nào
-        newCenter = ResolveDepenetration(newCenter, radius, mask);
-
         return newCenter - offset;
     }
 
@@ -487,21 +522,19 @@ public class PlayerController : NetworkBehaviour
     {
         if (dir == Vector2.zero) return;
 
-        transform.position = SimulateStep(transform.position, dir, Time.fixedDeltaTime);
+        Vector2 currentPosition = transform.position;
+        Vector2 nextPos = SimulateStep(currentPosition, dir, Time.deltaTime);
+        transform.position = nextPos;
         if (rb != null)
         {
-            rb.position = transform.position;
+            rb.position = nextPos;
         }
     }
 
     [ServerRpc(Delivery = RpcDelivery.Unreliable)]
     public void SubmitInputServerRpc(InputPayload input)
     {
-        var serverController = GetComponent<ServerPlayerController>();
-        if (serverController != null)
-        {
-            serverController.OnInputReceived(input);
-        }
+        // No-op
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -525,19 +558,16 @@ public class PlayerController : NetworkBehaviour
     private void DeathSequenceClientRpc()
     {
         enabled = false;
-        var clientController = GetComponent<ClientPlayerController>();
-        if (clientController != null) clientController.enabled = false;
-        var serverController = GetComponent<ServerPlayerController>();
-        if (serverController != null) serverController.enabled = false;
-
         var bombController = GetComponent<BombController>();
         if (bombController != null) bombController.enabled = false;
 
         playerVisual?.SetSortingOrder(1);
         var col = GetComponent<Collider2D>();
         if (col != null) col.enabled = false;
-        ScoreBoardController.Instance?.playerCardsDict[OwnerClientId]?.SetPlayerLeave("DEAD...");
-        // ScoreBoardController.Instance?.playerCardsDict.Remove(OwnerClientId);
+        if (ScoreBoardController.Instance != null && ScoreBoardController.Instance.playerCardsDict.ContainsKey(OwnerClientId))
+        {
+            ScoreBoardController.Instance.playerCardsDict[OwnerClientId]?.SetPlayerLeave("DEAD...");
+        }
         playerVisual?.SetDead(true);
         Invoke(nameof(OnDeathSequenceEnded), 1.25f);
     }
@@ -568,7 +598,12 @@ public class PlayerController : NetworkBehaviour
             skinObj.transform.localRotation = Quaternion.identity;
 
             playerVisual = skinObj.GetComponentInChildren<PlayerVisual>(true);
-            if(IsOwner)
+            if (playerVisual != null)
+            {
+                playerVisual.SetMovement(_moveDirection.Value);
+            }
+
+            if (IsOwner)
             {
                 isPlayerLoadDone.Value = true;
                 Debug.Log($"Skin changed to {skinKey} for player {OwnerClientId}");
@@ -597,35 +632,25 @@ public class PlayerController : NetworkBehaviour
     {
         if (!IsServer) return;
         ForceServerSpawnStateClientRpc(position, rotation);
+    }
 
-        var serverController = GetComponent<ServerPlayerController>();
-        if (serverController != null)
+    [ClientRpc]
+    public void ForceServerSpawnStateClientRpc(Vector2 position, Quaternion rotation)
+    {
+        transform.SetPositionAndRotation(position, rotation);
+
+        if (rb != null)
         {
-            serverController.ResetState(position);
+            rb.position = position;
+            rb.rotation = rotation.eulerAngles.z;
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
         }
 
-        StatePayload spawnState = new StatePayload
+        if (IsOwner)
         {
-            tick = 0,
-            position = position,
-            velocity = Vector2.zero
-        };
-
-        serverState.Value = spawnState;
-    }
-    [ClientRpc]
-    public void ForceServerSpawnStateClientRpc(Vector2 position, Quaternion rotation){
-        
-        transform.SetPositionAndRotation(position, rotation);
-        rb.position = position;
-        rb.rotation = rotation.eulerAngles.z;
-        rb.velocity = Vector2.zero;
-        rb.angularVelocity = 0f;
-
-        var clientController = GetComponent<ClientPlayerController>();
-        if (clientController != null)
-        {
-            clientController.ResetPrediction(position);
+            _networkPosition.Value = position;
+            _moveDirection.Value = Vector2.zero;
         }
     }
 }

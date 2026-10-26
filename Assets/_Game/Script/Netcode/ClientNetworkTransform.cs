@@ -19,5 +19,20 @@ namespace Unity.Multiplayer.Samples.Utilities.ClientAuthority
         {
             return false;
         }
+
+        protected override void Awake()
+        {
+            base.Awake();
+            SyncPositionX = true;
+            SyncPositionY = true;
+            SyncPositionZ = false;
+            SyncRotAngleX = false;
+            SyncRotAngleY = false;
+            SyncRotAngleZ = false;
+            SyncScaleX = false;
+            SyncScaleY = false;
+            SyncScaleZ = false;
+            Interpolate = true;
+        }
     }
 }

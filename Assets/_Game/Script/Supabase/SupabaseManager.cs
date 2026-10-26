@@ -35,6 +35,9 @@ public class SupabaseManager : MonoBehaviour
 
     private async void Awake()
     {
+        Application.runInBackground = true;
+        QualitySettings.vSyncCount = 0; // Tắt VSync để Windows không bóp FPS cửa sổ chạy ngầm khi mở 2 bản build
+        Application.targetFrameRate = 60;
         DontDestroyOnLoad(gameObject);
         await EnsureInitializedAsync(supabaseUrl, supabaseAnonKey);
     }
