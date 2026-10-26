@@ -1,4 +1,4 @@
-﻿using DG.Tweening;
+using DG.Tweening;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -33,6 +33,10 @@ public class Bombit : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         ResolveDestructibleTilemap();
+        if (IsClient)
+        {
+            BombController.NotifyBombSpawnedClient(transform.position);
+        }
     }
     private bool ResolveDestructibleTilemap()
     {

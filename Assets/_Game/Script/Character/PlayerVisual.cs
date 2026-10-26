@@ -4,8 +4,8 @@ using UnityEngine;
 public class PlayerVisual : MonoBehaviour
 {
     [Header("Correction")]
-    [SerializeField] private float visualCorrectionReturnSpeed = 24f;
-    [SerializeField] private float maxVisualOffset = 0.35f;
+    [SerializeField] private float visualCorrectionReturnSpeed = 12f;
+    [SerializeField] private float maxVisualOffset = 0.6f;
 
     private Animator anim;
     private SpriteRenderer spriteRenderer;
@@ -31,10 +31,11 @@ public class PlayerVisual : MonoBehaviour
             return;
         }
 
-        transform.localPosition = Vector3.MoveTowards(
-            transform.localPosition,
-            Vector3.zero,
-            visualCorrectionReturnSpeed * Time.deltaTime);
+        // Smoothly decay visual offset to local zero as physics root catches up
+        Vector3 target = Vector3.zero;
+        Vector3 nextLocalPos = Vector3.Lerp(transform.localPosition, target, visualCorrectionReturnSpeed * Time.deltaTime);
+        nextLocalPos = Vector3.MoveTowards(nextLocalPos, target, 0.05f * Time.deltaTime);
+        transform.localPosition = nextLocalPos;
     }
 
     public void SetMovement(Vector2 direction)
@@ -52,15 +53,9 @@ public class PlayerVisual : MonoBehaviour
         anim.SetFloat(animLastMoveY, lastDirection.y);
     }
 
-    public void ApplyCorrectionDelta(Vector2 worldDelta, bool forceResetVisual = false)
+    public void AddVisualOffset(Vector3 delta)
     {
-        if (forceResetVisual)
-        {
-            transform.localPosition = Vector3.zero;
-            return;
-        }
-
-        Vector3 nextOffset = transform.localPosition + (Vector3)worldDelta;
+        Vector3 nextOffset = transform.localPosition + delta;
         float maxOffsetSqr = maxVisualOffset * maxVisualOffset;
 
         if (nextOffset.sqrMagnitude > maxOffsetSqr)
@@ -69,6 +64,20 @@ public class PlayerVisual : MonoBehaviour
         }
 
         transform.localPosition = nextOffset;
+    }
+
+    public void ResetVisualOffset()
+    {
+        transform.localPosition = Vector3.zero;
+    }
+
+    // Retained for backward compatibility
+    public void AdvanceVisualInput(Vector2 direction, float speed, float deltaTime) { }
+    public void OffsetVisualLocal(Vector3 delta) => AddVisualOffset(delta);
+    public void ApplyCorrectionDelta(Vector2 worldDelta, bool forceResetVisual = false)
+    {
+        if (forceResetVisual) ResetVisualOffset();
+        else AddVisualOffset((Vector3)worldDelta);
     }
 
     public void SetDead(bool isDead)

@@ -71,11 +71,55 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _movespeed:
     m_InternalValue: 5
+  _life:
+    m_InternalValue: 1
   remotePositionLerp: 16
+  playerVisual: {fileID: 0}
+  rb: {fileID: 0}
+  touchingBomb: {fileID: 0}
   inputUp: 119
   inputDown: 115
   inputLeft: 97
   inputRight: 100
+  _currentSkinID:
+    m_InternalValue: -1
+  _CurrentPlayerName:
+    m_InternalValue:
+      utf8LengthInBytes: 0
+      bytes:
+        offset0000:
+          byte0000: 0
+          byte0001: 0
+          byte0002: 0
+          byte0003: 0
+          byte0004: 0
+          byte0005: 0
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        byte0016: 0
+        byte0017: 0
+        byte0018: 0
+        byte0019: 0
+        byte0020: 0
+        byte0021: 0
+        byte0022: 0
+        byte0023: 0
+        byte0024: 0
+        byte0025: 0
+        byte0026: 0
+        byte0027: 0
+        byte0028: 0
+        byte0029: 0
+  isPlayerLoadDone:
+    m_InternalValue: 0
 --- !u!114 &1099148541779744237
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -91,7 +135,6 @@ MonoBehaviour:
   inputKey: 32
   bombPrefab: {fileID: 3939017888894637700, guid: e10230ffd5e90c3489946b2652130401, type: 3}
   bombFuseTime: 3
-  bombAmount: 2
   explosionRadius:
     m_InternalValue: 1
   destructibleTiles: {fileID: 0}
@@ -127,9 +170,9 @@ CircleCollider2D:
   m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: -0.041044235, y: -0.40999985}
+  m_Offset: {x: -0.041044235, y: -0.33029938}
   serializedVersion: 2
-  m_Radius: 0.45
+  m_Radius: 0.40996265
 --- !u!50 &2835122771930677216
 Rigidbody2D:
   serializedVersion: 4
@@ -138,7 +181,7 @@ Rigidbody2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6741323104258140690}
-  m_BodyType: 0
+  m_BodyType: 1
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0

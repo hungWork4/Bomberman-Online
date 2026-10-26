@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -62,22 +63,71 @@ public class BombController : NetworkBehaviour
         }
         return null;
     }
+    private static readonly Dictionary<Vector2, GameObject> _activeAnticipationBombs = new Dictionary<Vector2, GameObject>();
+
     private void Update()
     {
         if (bombsRemaining.Value > 0 && Input.GetKeyDown(inputKey) && IsOwner && UnityChatController.IsChatting == false)
         {
-            PlaceBombServerRpc();
+            Vector2 position = new Vector2(Mathf.Round(transform.position.x), Mathf.Round(transform.position.y));
+
+            // Client-Side Action Anticipation: hiển thị quả bomb thử nghiệm tức thì trên màn hình Client
+            if (IsClient && !IsServer)
+            {
+                AnticipatePlaceBomb(position);
+            }
+
+            PlaceBombServerRpc(position);
         }
     }
-    [ServerRpc]
-    private void PlaceBombServerRpc()
+
+    private void AnticipatePlaceBomb(Vector2 position)
     {
-        StartCoroutine(PlaceBomb());
+        if (_activeAnticipationBombs.ContainsKey(position)) return;
+
+        GameObject ghostBomb = Instantiate(bombPrefab, position, Quaternion.identity);
+
+        var netObj = ghostBomb.GetComponent<NetworkObject>();
+        if (netObj != null) Destroy(netObj);
+
+        var bombit = ghostBomb.GetComponent<Bombit>();
+        if (bombit != null) Destroy(bombit);
+
+        var col = ghostBomb.GetComponent<Collider2D>();
+        if (col != null) col.isTrigger = true;
+
+        _activeAnticipationBombs[position] = ghostBomb;
+        StartCoroutine(AnticipationSafeguardRoutine(position, ghostBomb, 0.8f));
+    }
+
+    private IEnumerator AnticipationSafeguardRoutine(Vector2 position, GameObject ghostBomb, float timeout)
+    {
+        yield return new WaitForSeconds(timeout);
+        if (_activeAnticipationBombs.TryGetValue(position, out GameObject currentGhost) && currentGhost == ghostBomb)
+        {
+            _activeAnticipationBombs.Remove(position);
+            if (ghostBomb != null) Destroy(ghostBomb);
+        }
+    }
+
+    public static void NotifyBombSpawnedClient(Vector2 position)
+    {
+        Vector2 rounded = new Vector2(Mathf.Round(position.x), Mathf.Round(position.y));
+        if (_activeAnticipationBombs.TryGetValue(rounded, out GameObject ghost))
+        {
+            _activeAnticipationBombs.Remove(rounded);
+            if (ghost != null) Destroy(ghost);
+        }
+    }
+
+    [ServerRpc]
+    private void PlaceBombServerRpc(Vector2 position)
+    {
+        StartCoroutine(PlaceBomb(position));
     }
     
-    private IEnumerator PlaceBomb()
+    private IEnumerator PlaceBomb(Vector2 position)
     {
-        Vector2 position = transform.position;
         position.x = Mathf.Round(position.x);
         position.y = Mathf.Round(position.y);
 

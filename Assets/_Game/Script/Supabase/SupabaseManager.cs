@@ -511,6 +511,43 @@ public class SupabaseManager : MonoBehaviour
         }
     }
 
+    public static void SetMockPlayerSnapshot(string displayName = null, string userId = null)
+    {
+        if (string.IsNullOrEmpty(userId))
+        {
+            userId = "dev_" + System.Guid.NewGuid().ToString("N").Substring(0, 8);
+        }
+
+        if (string.IsNullOrEmpty(displayName))
+        {
+            displayName = "Tester_" + UnityEngine.Random.Range(100, 999);
+        }
+
+        CurrentUserId = userId;
+        CurrentAccessToken = "mock-dev-access-token";
+
+        PlayerSnapshot snapshot = new PlayerSnapshot
+        {
+            UserId = userId,
+            DisplayName = displayName,
+            Gold = 99999,
+            CurrentSkinId = 0,
+            OwnedSkinIds = new HashSet<long> { 0, 1, 2, 3, 4, 5 }
+        };
+
+        CurrentPlayerSnapshot = snapshot;
+        HasPlayerSnapshot = true;
+        playerSnapshotsByUserId[userId] = snapshot;
+
+        skinKeyCache[0] = "White_Def";
+
+        PlayerPrefs.SetString("username", displayName);
+        PlayerPrefs.SetString("SupabaseUserId", userId);
+        PlayerPrefs.Save();
+
+        Debug.Log($"<color=green>[SupabaseManager] Mock player session initialized: {displayName} (ID: {userId})</color>");
+    }
+
     public static void ClearAuthContext()
     {
         CurrentUserId = null;
